@@ -33,10 +33,12 @@ class EffectChainSlot : public QObject {
     EffectSlotPointer addEffectSlot(const QString& group);
     EffectSlotPointer getEffectSlot(unsigned int slotNumber);
 
-    void loadEffectChain(EffectChainPointer pEffectChain);
+    void loadEffectChainToSlot(EffectChainPointer pEffectChain);
+    void updateRoutingSwitches();
     EffectChainPointer getEffectChain() const;
+    EffectChainPointer getOrCreateEffectChain(EffectsManager* pEffectsManager);
 
-    void registerChannel(const ChannelHandleAndGroup& handle_group);
+    void registerInputChannel(const ChannelHandleAndGroup& handle_group);
 
     double getSuperParameter() const;
     void setSuperParameter(double value, bool force = false);
@@ -50,6 +52,9 @@ class EffectChainSlot : public QObject {
     const QString& getGroup() const {
         return m_group;
     }
+
+    QDomElement toXml(QDomDocument* doc) const;
+    void loadChainSlotFromXml(const QDomElement& effectChainElement);
 
   signals:
     // Indicates that the effect pEffect has been loaded into slotNumber of
@@ -97,7 +102,7 @@ class EffectChainSlot : public QObject {
     void slotChainNameChanged(const QString& name);
     void slotChainEnabledChanged(bool enabled);
     void slotChainMixChanged(double mix);
-    void slotChainInsertionTypeChanged(EffectChain::InsertionType type);
+    void slotChainInsertionTypeChanged(EffectChainInsertionType type);
     void slotChainChannelStatusChanged(const QString& group, bool enabled);
 
     void slotEffectLoaded(EffectPointer pEffect, unsigned int slotNumber);

@@ -30,6 +30,10 @@ class EffectSlot : public QObject {
     // returns a null EffectPointer.
     EffectPointer getEffect() const;
 
+    inline bool getEnableState() const {
+        return m_pControlEnabled->toBool();
+    }
+
     inline int getEffectSlotNumber() const {
         return m_iEffectNumber;
     }
@@ -37,6 +41,7 @@ class EffectSlot : public QObject {
     unsigned int numParameterSlots() const;
     EffectParameterSlotPointer addEffectParameterSlot();
     EffectParameterSlotPointer getEffectParameterSlot(unsigned int slotNumber);
+    EffectParameterSlotPointer getEffectParameterSlotForConfigKey(unsigned int slotNumber);
     inline const QList<EffectParameterSlotPointer>& getEffectParameterSlots() const {
         return m_parameters;
     };
@@ -60,6 +65,9 @@ class EffectSlot : public QObject {
     const QString& getGroup() const {
         return m_group;
     }
+
+    QDomElement toXml(QDomDocument* doc) const;
+    void loadEffectSlotFromXml(const QDomElement& effectElement);
 
   public slots:
     // Request that this EffectSlot load the given Effect

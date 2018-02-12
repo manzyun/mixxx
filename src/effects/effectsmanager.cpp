@@ -9,28 +9,37 @@
 #include "engine/effects/engineeffectchain.h"
 #include "util/assert.h"
 
-const char* kEqualizerRackName = "[EqualizerChain]";
-const char* kQuickEffectRackName = "[QuickEffectChain]";
+namespace {
+const QString kEffectGroupSeparator = "_";
+const QString kGroupClose = "]";
+const unsigned int kEffectMessagPipeFifoSize = 2048;
+} // anonymous namespace
 
-EffectsManager::EffectsManager(QObject* pParent, UserSettingsPointer pConfig)
+
+EffectsManager::EffectsManager(QObject* pParent, UserSettingsPointer pConfig,
+                               ChannelHandleFactory* pChannelHandleFactory)
         : QObject(pParent),
+          m_pChannelHandleFactory(pChannelHandleFactory),
           m_pEffectChainManager(new EffectChainManager(pConfig, this)),
           m_nextRequestId(0),
           m_pLoEqFreq(NULL),
           m_pHiEqFreq(NULL),
           m_underDestruction(false) {
-    qRegisterMetaType<EffectChain::InsertionType>("EffectChain::InsertionType");
+    qRegisterMetaType<EffectChainInsertionType>("EffectChainInsertionType");
     QPair<EffectsRequestPipe*, EffectsResponsePipe*> requestPipes =
             TwoWayMessagePipe<EffectsRequest*, EffectsResponse>::makeTwoWayMessagePipe(
-                2048, 2048, false, false);
+                kEffectMessagPipeFifoSize, kEffectMessagPipeFifoSize, false, false);
 
     m_pRequestPipe.reset(requestPipes.first);
     m_pEngineEffectsManager = new EngineEffectsManager(requestPipes.second);
+
+    m_pNumEffectsAvailable = new ControlObject(ConfigKey("[Master]", "num_effectsavailable"));
+    m_pNumEffectsAvailable->setReadOnly();
 }
 
 EffectsManager::~EffectsManager() {
     m_underDestruction = true;
-    //m_pEffectChainManager->saveEffectChains();
+    m_pEffectChainManager->saveEffectChains();
     delete m_pEffectChainManager;
     // This must be done here, since the engineRacks are deleted via
     // the queue
@@ -47,6 +56,7 @@ EffectsManager::~EffectsManager() {
 
     delete m_pHiEqFreq;
     delete m_pLoEqFreq;
+    delete m_pNumEffectsAvailable;
     // Safe because the Engine is deleted before EffectsManager. Also, it holds
     // a bare pointer to m_pRequestPipe so it is critical that it does not
     // outlast us.
@@ -69,6 +79,8 @@ void EffectsManager::addEffectsBackend(EffectsBackend* pBackend) {
         m_availableEffectManifests.append(pBackend->getManifest(effectId));
     }
 
+    m_pNumEffectsAvailable->forceSet(m_availableEffectManifests.size());
+
     qSort(m_availableEffectManifests.begin(), m_availableEffectManifests.end(),
           alphabetizeEffectManifests);
 
@@ -84,14 +96,23 @@ void EffectsManager::slotBackendRegisteredEffect(EffectManifest manifest) {
                                        m_availableEffectManifests.end(),
                                        manifest, alphabetizeEffectManifests);
     m_availableEffectManifests.insert(insertion_point, manifest);
+    m_pNumEffectsAvailable->forceSet(m_availableEffectManifests.size());
 }
 
-void EffectsManager::registerChannel(const ChannelHandleAndGroup& handle_group) {
-    m_pEffectChainManager->registerChannel(handle_group);
+void EffectsManager::registerInputChannel(const ChannelHandleAndGroup& handle_group) {
+    m_pEffectChainManager->registerInputChannel(handle_group);
 }
 
-const QSet<ChannelHandleAndGroup>& EffectsManager::registeredChannels() const {
-    return m_pEffectChainManager->registeredChannels();
+const QSet<ChannelHandleAndGroup>& EffectsManager::registeredInputChannels() const {
+    return m_pEffectChainManager->registeredInputChannels();
+}
+
+void EffectsManager::registerOutputChannel(const ChannelHandleAndGroup& handle_group) {
+    m_pEffectChainManager->registerOutputChannel(handle_group);
+}
+
+const QSet<ChannelHandleAndGroup>& EffectsManager::registeredOutputChannels() const {
+    return m_pEffectChainManager->registeredOutputChannels();
 }
 
 const QList<EffectManifest> EffectsManager::getAvailableEffectManifestsFiltered(
@@ -207,21 +228,102 @@ QuickEffectRackPointer EffectsManager::getQuickEffectRack(int rack) {
     return m_pEffectChainManager->getQuickEffectRack(rack);
 }
 
+OutputEffectRackPointer EffectsManager::addOutputsEffectRack() {
+    return m_pEffectChainManager->addOutputsEffectRack();
+}
+
+OutputEffectRackPointer EffectsManager::getOutputsEffectRack() {
+    return m_pEffectChainManager->getMasterEffectRack();
+}
+
 EffectRackPointer EffectsManager::getEffectRack(const QString& group) {
     return m_pEffectChainManager->getEffectRack(group);
 }
 
-void EffectsManager::setupDefaults() {
-    //m_pEffectChainManager->loadEffectChains();
+EffectSlotPointer EffectsManager::getEffectSlot(
+        const QString& group) {
+    QRegExp intRegEx(".*(\\d+).*");
 
-    // Add a general purpose rack
-    StandardEffectRackPointer pStandardRack = addStandardEffectRack();
-    pStandardRack->addEffectChainSlot();
-    pStandardRack->addEffectChainSlot();
-    pStandardRack->addEffectChainSlot();
-    pStandardRack->addEffectChainSlot();
+    QStringList parts = group.split(kEffectGroupSeparator);
 
-    EffectChainPointer pChain = EffectChainPointer(new EffectChain(
+    EffectRackPointer pRack = getEffectRack(parts.at(0) + kGroupClose);
+    VERIFY_OR_DEBUG_ASSERT(pRack) {
+        return EffectSlotPointer();
+    }
+
+    EffectChainSlotPointer pChainSlot;
+    if (parts.at(0) == "[EffectRack1") {
+        intRegEx.indexIn(parts.at(1));
+        pChainSlot = pRack->getEffectChainSlot(intRegEx.cap(1).toInt() - 1);
+    } else {
+        // Assume a PerGroupRack
+        const QString chainGroup =
+                parts.at(0) + kEffectGroupSeparator + parts.at(1) + kGroupClose;
+        for (int i = 0; i < pRack->numEffectChainSlots(); ++i) {
+            EffectChainSlotPointer pSlot = pRack->getEffectChainSlot(i);
+            if (pSlot->getGroup() == chainGroup) {
+                pChainSlot = pSlot;
+                break;
+            }
+        }
+    }
+    VERIFY_OR_DEBUG_ASSERT(pChainSlot) {
+        return EffectSlotPointer();
+    }
+
+    intRegEx.indexIn(parts.at(2));
+    EffectSlotPointer pEffectSlot =
+            pChainSlot->getEffectSlot(intRegEx.cap(1).toInt() - 1);
+    return pEffectSlot;
+}
+
+EffectParameterSlotPointer EffectsManager::getEffectParameterSlot(
+        const ConfigKey& configKey) {
+    EffectSlotPointer pEffectSlot =
+             getEffectSlot(configKey.group);
+    VERIFY_OR_DEBUG_ASSERT(pEffectSlot) {
+        return EffectParameterSlotPointer();
+    }
+
+    QRegExp intRegEx(".*(\\d+).*");
+    intRegEx.indexIn(configKey.item);
+    EffectParameterSlotPointer pParameterSlot =
+            pEffectSlot->getEffectParameterSlot(intRegEx.cap(1).toInt() - 1);
+    return pParameterSlot;
+}
+
+EffectButtonParameterSlotPointer EffectsManager::getEffectButtonParameterSlot(
+        const ConfigKey& configKey) {
+    EffectSlotPointer pEffectSlot =
+             getEffectSlot(configKey.group);
+    VERIFY_OR_DEBUG_ASSERT(pEffectSlot) {
+        return EffectButtonParameterSlotPointer();
+    }
+
+    QRegExp intRegEx(".*(\\d+).*");
+    intRegEx.indexIn(configKey.item);
+    EffectButtonParameterSlotPointer pParameterSlot =
+            pEffectSlot->getEffectButtonParameterSlot(intRegEx.cap(1).toInt() - 1);
+    return pParameterSlot;
+}
+
+
+void EffectsManager::setup() {
+    // These controls are used inside EQ Effects
+    m_pLoEqFreq = new ControlPotmeter(ConfigKey("[Mixer Profile]", "LoEQFrequency"), 0., 22040);
+    m_pHiEqFreq = new ControlPotmeter(ConfigKey("[Mixer Profile]", "HiEQFrequency"), 0., 22040);
+
+    // NOTE(Be): Effect racks are processed in the order they are added here.
+
+    // Add prefader effect racks
+    addEqualizerRack();
+    addQuickEffectRack();
+
+    // Add postfader effect racks
+    addStandardEffectRack();
+    addOutputsEffectRack();
+
+    EffectChainPointer pChain(new EffectChain(
            this, "org.mixxx.effectchain.flanger"));
     pChain->setName(tr("Flanger"));
     EffectPointer pEffect = instantiateEffect(
@@ -266,35 +368,24 @@ void EffectsManager::setupDefaults() {
     pChain->addEffect(pEffect);
     m_pEffectChainManager->addEffectChain(pChain);
 
-    // These controls are used inside EQ Effects
-    m_pLoEqFreq = new ControlPotmeter(ConfigKey("[Mixer Profile]", "LoEQFrequency"), 0., 22040);
-    m_pHiEqFreq = new ControlPotmeter(ConfigKey("[Mixer Profile]", "HiEQFrequency"), 0., 22040);
+    pChain = EffectChainPointer(new EffectChain(
+            this, "org.mixxx.effectchain.tremolo"));
+    pChain->setName(tr("Tremolo"));
+    pEffect = instantiateEffect("org.mixxx.effects.tremolo");
+    pChain->addEffect(pEffect);
+    m_pEffectChainManager->addEffectChain(pChain);
+}
 
-    // Add an EqualizerRack.
-    EqualizerRackPointer pEqRack = addEqualizerRack();
-    // Add Master EQ here, because EngineMaster is already up
-    pEqRack->addEffectChainSlotForGroup("[Master]");
-
-    // Add a QuickEffectRack
-    addQuickEffectRack();
+void EffectsManager::loadEffectChains() {
+    // populate rack and restore state from effects.xml
+    m_pEffectChainManager->loadEffectChains();
 }
 
 bool EffectsManager::writeRequest(EffectsRequest* request) {
     if (m_underDestruction) {
         // Catch all delete Messages since the engine is already down
-        // and we cannot what for a communication cycle
-        if (request->type == EffectsRequest::REMOVE_EFFECT_FROM_CHAIN) {
-            //qDebug() << debugString() << "delete" << request->RemoveEffectFromChain.pEffect;
-            delete request->RemoveEffectFromChain.pEffect;
-        } else if (request->type == EffectsRequest::REMOVE_CHAIN_FROM_RACK) {
-            //qDebug() << debugString() << "delete" << request->RemoveEffectFromChain.pEffect;
-            delete request->RemoveChainFromRack.pChain;
-        } else if (request->type == EffectsRequest::REMOVE_EFFECT_RACK) {
-            //qDebug() << debugString() << "delete" << request->RemoveEffectRack.pRack;
-            delete request->RemoveEffectRack.pRack;
-        }
-        delete request;
-        return false;
+        // and we cannot wait for a communication cycle
+        collectGarbage(request);
     }
 
     if (m_pRequestPipe.isNull()) {
@@ -302,8 +393,8 @@ bool EffectsManager::writeRequest(EffectsRequest* request) {
         return false;
     }
 
-    // This is effectively only GC at this point so only deal with responses
-    // when writing new requests.
+    // This is effectively only garbage collection at this point so only deal
+    // with responses when writing new requests.
     processEffectsResponses();
 
     request->request_id = m_nextRequestId++;
@@ -326,7 +417,7 @@ void EffectsManager::processEffectsResponses() {
         QHash<qint64, EffectsRequest*>::iterator it =
                 m_activeRequests.find(response.request_id);
 
-        if (it == m_activeRequests.end()) {
+        VERIFY_OR_DEBUG_ASSERT(it != m_activeRequests.end()) {
             qWarning() << debugString()
                        << "WARNING: EffectsResponse with an inactive request_id:"
                        << response.request_id;
@@ -336,27 +427,39 @@ void EffectsManager::processEffectsResponses() {
                it.key() == response.request_id) {
             EffectsRequest* pRequest = it.value();
 
-            if (!response.success) {
-                qWarning() << debugString() << "WARNING: Failed EffectsRequest"
-                           << "type" << pRequest->type;
-            } else {
-                //qDebug() << debugString() << "EffectsRequest Success"
-                //           << "type" << pRequest->type;
+            // Don't check whether the response was successful here because
+            // specific errors should be caught with DEBUG_ASSERTs in
+            // EngineEffectsManager and functions it calls to handle requests.
 
-                if (pRequest->type == EffectsRequest::REMOVE_EFFECT_FROM_CHAIN) {
-                    //qDebug() << debugString() << "delete" << pRequest->RemoveEffectFromChain.pEffect;
-                    delete pRequest->RemoveEffectFromChain.pEffect;
-                } else if (pRequest->type == EffectsRequest::REMOVE_CHAIN_FROM_RACK) {
-                    //qDebug() << debugString() << "delete" << request->RemoveEffectFromChain.pEffect;
-                    delete pRequest->RemoveChainFromRack.pChain;
-                } else if (pRequest->type == EffectsRequest::REMOVE_EFFECT_RACK) {
-                    qDebug() << debugString() << "delete" << pRequest->RemoveEffectRack.pRack;
-                    delete pRequest->RemoveEffectRack.pRack;
-                }
-            }
+            collectGarbage(pRequest);
 
             delete pRequest;
             it = m_activeRequests.erase(it);
         }
+    }
+}
+
+void EffectsManager::collectGarbage(const EffectsRequest* pRequest) {
+    if (pRequest->type == EffectsRequest::REMOVE_EFFECT_FROM_CHAIN) {
+        if (kEffectDebugOutput) {
+            qDebug() << debugString() << "delete" << pRequest->RemoveEffectFromChain.pEffect;
+        }
+        delete pRequest->RemoveEffectFromChain.pEffect;
+    } else if (pRequest->type == EffectsRequest::REMOVE_CHAIN_FROM_RACK) {
+        if (kEffectDebugOutput) {
+            qDebug() << debugString() << "delete" << pRequest->RemoveEffectFromChain.pEffect;
+        }
+        delete pRequest->RemoveChainFromRack.pChain;
+    } else if (pRequest->type == EffectsRequest::REMOVE_EFFECT_RACK) {
+        if (kEffectDebugOutput) {
+            qDebug() << debugString() << "delete" << pRequest->RemoveEffectRack.pRack;
+        }
+        delete pRequest->RemoveEffectRack.pRack;
+    } else if (pRequest->type == EffectsRequest::DISABLE_EFFECT_CHAIN_FOR_INPUT_CHANNEL) {
+        if (kEffectDebugOutput) {
+            qDebug() << debugString() << "deleting states for input channel" << pRequest->DisableInputChannelForChain.pChannelHandle << "for EngineEffectChain" << pRequest->pTargetChain;
+        }
+        pRequest->pTargetChain->deleteStatesForInputChannel(
+                pRequest->DisableInputChannelForChain.pChannelHandle);
     }
 }

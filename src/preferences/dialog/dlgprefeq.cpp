@@ -52,9 +52,11 @@ DlgPrefEQ::DlgPrefEQ(QWidget* pParent, EffectsManager* pEffectsManager,
           m_firstSelectorLabel(NULL),
           m_pNumDecks(NULL),
           m_inSlotPopulateDeckEffectSelectors(false),
-          m_bEqAutoReset(false) {
+          m_bEqAutoReset(false),
+          m_bGainAutoReset(false) {
     m_pEQEffectRack = m_pEffectsManager->getEqualizerRack(0);
     m_pQuickEffectRack = m_pEffectsManager->getQuickEffectRack(0);
+    m_pOutputEffectRack = m_pEffectsManager->getOutputsEffectRack();
 
     setupUi(this);
     // Connection
@@ -67,6 +69,7 @@ DlgPrefEQ::DlgPrefEQ(QWidget* pParent, EffectsManager* pEffectsManager,
     connect(SliderLoEQ, SIGNAL(sliderReleased()), this, SLOT(slotUpdateLoEQ()));
 
     connect(CheckBoxEqAutoReset, SIGNAL(stateChanged(int)), this, SLOT(slotUpdateEqAutoReset(int)));
+    connect(CheckBoxGainAutoReset, SIGNAL(stateChanged(int)), this, SLOT(slotUpdateGainAutoReset(int)));
     connect(CheckBoxBypass, SIGNAL(stateChanged(int)), this, SLOT(slotBypass(int)));
 
     connect(CheckBoxEqOnly, SIGNAL(stateChanged(int)),
@@ -184,7 +187,8 @@ static bool isMasterEQ(const EffectManifest& pManifest) {
 
 static bool hasSuperKnobLinking(const EffectManifest& pManifest) {
     for (const auto& pParameterManifest : pManifest.parameters()) {
-        if (pParameterManifest.defaultLinkType() != EffectManifestParameter::LINK_NONE) {
+        if (pParameterManifest.defaultLinkType() !=
+            EffectManifestParameter::LinkType::NONE) {
             return true;
         }
     }
@@ -306,6 +310,9 @@ void DlgPrefEQ::loadSettings() {
     m_bEqAutoReset = static_cast<bool>(m_pConfig->getValueString(
             ConfigKey(kConfigKey, "EqAutoReset")).toInt());
     CheckBoxEqAutoReset->setChecked(m_bEqAutoReset);
+    m_bGainAutoReset = static_cast<bool>(m_pConfig->getValueString(
+            ConfigKey(kConfigKey, "GainAutoReset")).toInt());
+    CheckBoxGainAutoReset->setChecked(m_bGainAutoReset);
     CheckBoxBypass->setChecked(m_pConfig->getValue(
             ConfigKey(kConfigKey, kEnableEqs), QString("yes")) == "no");
     CheckBoxEqOnly->setChecked(m_pConfig->getValue(
@@ -369,6 +376,8 @@ void DlgPrefEQ::slotResetToDefaults() {
     CheckBoxSingleEqEffect->setChecked(Qt::Checked);
     m_bEqAutoReset = false;
     CheckBoxEqAutoReset->setChecked(Qt::Unchecked);
+    m_bGainAutoReset = false;
+    CheckBoxGainAutoReset->setChecked(Qt::Unchecked);
     slotUpdate();
     slotApply();
 }
@@ -484,15 +493,34 @@ void DlgPrefEQ::applySelections() {
             box->setCurrentIndex(firstEffectIndex);
         }
 
-        EffectPointer pEffect = m_pEffectsManager->instantiateEffect(effectId);
-        m_pQuickEffectRack->loadEffectToGroup(group, pEffect);
+        // Only apply the effect if it changed -- so first interrogate the
+        // loaded effect if any.
+        bool need_load = true;
+        if (m_pQuickEffectRack->numEffectChainSlots() > deck) {
+            // It's not correct to get a chainslot by index number -- get by
+            // group name instead.
+            EffectChainSlotPointer chainslot =
+                    m_pQuickEffectRack->getGroupEffectChainSlot(group);
+            if (chainslot && chainslot->numSlots()) {
+                EffectPointer effectpointer =
+                        chainslot->getEffectSlot(0)->getEffect();
+                if (effectpointer &&
+                        effectpointer->getManifest().id() == effectId) {
+                    need_load = false;
+                }
+            }
+        }
+        if (need_load) {
+            EffectPointer pEffect = m_pEffectsManager->instantiateEffect(effectId);
+            m_pQuickEffectRack->loadEffectToGroup(group, pEffect);
 
-        m_pConfig->set(ConfigKey(kConfigKey, "QuickEffectForGroup_" + group),
-                ConfigValue(effectId));
+            m_pConfig->set(ConfigKey(kConfigKey, "QuickEffectForGroup_" + group),
+                    ConfigValue(effectId));
 
-        // This is required to remove a previous selected effect that does not
-        // fit to the current ShowAllEffects checkbox
-        slotPopulateDeckEffectSelectors();
+            // This is required to remove a previous selected effect that does not
+            // fit to the current ShowAllEffects checkbox
+            slotPopulateDeckEffectSelectors();
+        }
         ++deck;
     }
 }
@@ -577,6 +605,8 @@ void DlgPrefEQ::slotApply() {
     m_COHiFreq.set(m_highEqFreq);
     m_pConfig->set(ConfigKey(kConfigKey,"EqAutoReset"),
             ConfigValue(m_bEqAutoReset ? 1 : 0));
+    m_pConfig->set(ConfigKey(kConfigKey,"GainAutoReset"),
+        ConfigValue(m_bGainAutoReset ? 1 : 0));
     applySelections();
 }
 
@@ -586,10 +616,15 @@ void DlgPrefEQ::slotUpdate() {
     slotUpdateHiEQ();
     slotPopulateDeckEffectSelectors();
     CheckBoxEqAutoReset->setChecked(m_bEqAutoReset);
+    CheckBoxGainAutoReset->setChecked(m_bGainAutoReset);
 }
 
 void DlgPrefEQ::slotUpdateEqAutoReset(int i) {
     m_bEqAutoReset = static_cast<bool>(i);
+}
+
+void DlgPrefEQ::slotUpdateGainAutoReset(int i) {
+    m_bGainAutoReset = static_cast<bool>(i);
 }
 
 void DlgPrefEQ::slotBypass(int state) {
@@ -646,7 +681,6 @@ void DlgPrefEQ::setUpMasterEQ() {
         masterEqIndex = availableMasterEQEffects.size(); // selects "None"
     }
     comboBoxMasterEq->setCurrentIndex(masterEqIndex);
-    slotMasterEqEffectChanged(masterEqIndex);
 
     // Load parameters from preferences:
     EffectPointer effect(m_pEffectMasterEQ);
@@ -684,24 +718,18 @@ void DlgPrefEQ::slotMasterEqEffectChanged(int effectIndex) {
         pbResetMasterEq->show();
     }
 
-    EffectChainSlotPointer pChainSlot =
-            m_pEQEffectRack->getGroupEffectChainSlot("[Master]");
+    EffectChainSlotPointer pChainSlot = m_pOutputEffectRack->getEffectChainSlot(0);
 
     if (pChainSlot) {
         EffectChainPointer pChain = pChainSlot->getEffectChain();
-        if (pChain.isNull()) {
-            pChain = EffectChainPointer(new EffectChain(m_pEffectsManager, QString(),
-                                        EffectChainPointer()));
-            pChain->setName(QObject::tr("Empty Chain"));
-            pChainSlot->loadEffectChain(pChain);
+        VERIFY_OR_DEBUG_ASSERT(pChain) {
+            pChain = pChainSlot->getOrCreateEffectChain(m_pEffectsManager);
         }
         EffectPointer pEffect = m_pEffectsManager->instantiateEffect(effectId);
         pChain->replaceEffect(0, pEffect);
 
-        QString group = m_pEQEffectRack->formatEffectSlotGroupString(0, "[Master]");
-        ControlObject::set(ConfigKey(group, "enabled"), 1);
-
         if (pEffect) {
+            pEffect->setEnabled(true);
             m_pEffectMasterEQ = pEffect;
 
             int knobNum = pEffect->numKnobParameters();

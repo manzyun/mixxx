@@ -1,0 +1,69 @@
+<!--
+Description:
+  VUMeter embedded in channel mixer.
+Variables:
+  group   : [ChannelN]
+  chanNum : channel number
+-->
+<Template>
+  <WidgetGroup>
+    <ObjectName>VUMeterMixer</ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>me,min</SizePolicy>
+    <Children>
+      <WidgetGroup><!-- VU Left -->
+        <Layout>stacked</Layout>
+        <Size>4f,1me</Size>
+        <Children>
+          <StatusLight>
+            <TooltipId>channel_VuMeterL</TooltipId>
+            <PathStatusLight>skin:/graphics/vumeter_mixer_clipping_over.png</PathStatusLight>
+            <PathBack>skin:/graphics/vumeter_mixer_clipping.png</PathBack>
+            <Connection>
+              <ConfigKey><Variable name="group"/>,PeakIndicatorL</ConfigKey>
+            </Connection>
+          </StatusLight>
+          <VuMeter>
+            <PathVu>skin:/graphics/vumeter_mixer_over.png</PathVu>
+            <PathBack>skin:/graphics/vumeter_mixer.png</PathBack>
+            <Horizontal>false</Horizontal>
+            <PeakHoldSize>5</PeakHoldSize>
+            <PeakHoldTime>500</PeakHoldTime>
+            <PeakFallTime>50</PeakFallTime>
+            <PeakFallStep>2</PeakFallStep>
+            <Connection>
+              <ConfigKey><Variable name="group"/>,VuMeterL</ConfigKey>
+            </Connection>
+          </VuMeter>
+        </Children>
+      </WidgetGroup><!-- /VU Left -->
+
+      <WidgetGroup><!-- VU Right -->
+        <Layout>stacked</Layout>
+        <Size>4f,1me</Size>
+        <Children>
+          <StatusLight>
+            <TooltipId>channel_VuMeterR</TooltipId>
+            <PathStatusLight>skin:/graphics/vumeter_mixer_clipping_over.png</PathStatusLight>
+            <PathBack>skin:/graphics/vumeter_mixer_clipping.png</PathBack>
+            <Connection>
+              <ConfigKey><Variable name="group"/>,PeakIndicatorR</ConfigKey>
+            </Connection>
+          </StatusLight>
+          <VuMeter>
+            <PathVu>skin:/graphics/vumeter_mixer_over.png</PathVu>
+            <PathBack>skin:/graphics/vumeter_mixer.png</PathBack>
+            <Horizontal>false</Horizontal>
+            <PeakHoldSize>5</PeakHoldSize>
+            <PeakHoldTime>500</PeakHoldTime>
+            <PeakFallTime>50</PeakFallTime>
+            <PeakFallStep>2</PeakFallStep>
+            <Connection>
+              <ConfigKey><Variable name="group"/>,VuMeterR</ConfigKey>
+            </Connection>
+          </VuMeter>
+        </Children>
+      </WidgetGroup><!-- /VU Right -->
+    </Children>
+  </WidgetGroup>
+</Template>

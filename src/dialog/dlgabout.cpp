@@ -40,7 +40,10 @@ DlgAbout::DlgAbout(QWidget* parent) : QDialog(parent), Ui::DlgAboutDlg() {
             << "Ilkka Tuohela"
             << "Max Linke"
             << "Marcos Cardinot"
-            << "Nicu Badescu";
+            << "Nicu Badescu"
+            << "Uwe Klotz"
+            << "Be"
+            << "S&eacute;bastien Blaisot";
 
     QStringList thisReleaseContributors;
     thisReleaseContributors
@@ -61,7 +64,6 @@ DlgAbout::DlgAbout(QWidget* parent) : QDialog(parent), Ui::DlgAboutDlg() {
             << "Florian Kiekh&auml;fer"
             << "Michael Sawyer"
             << "Tuukka Pasanen"
-            << "Uwe Klotz"
             << "Quentin Faidide"
             << "Peter G. Marczis"
             << "Khyrul Bashar"
@@ -90,18 +92,16 @@ DlgAbout::DlgAbout(QWidget* parent) : QDialog(parent), Ui::DlgAboutDlg() {
             << "Marco Angerer"
             << "Ferran Pujol Camins"
             << "Markus Kl&ouml;sges"
-            << "S&eacute;bastien Blaisot"
             << "Vladim&iacute;r Dudr"
             << "Thorsten Munsch"
             << "Emile Vrijdags"
-            << "Be"
             << "Neale Pickett"
             << "St&eacute;phane Guillou"
             << "Russ Mannex"
             << "Brendan Austin"
             << "Lorenz Drescher"
             << "David Guglielmi"
-            << "JAmes Atwill"
+            << "James Atwill"
             << "Chlo&eacute; Avrillon"
             << "Hendrik Reglin"
             << "Pavel Potocek"
@@ -118,7 +118,16 @@ DlgAbout::DlgAbout(QWidget* parent) : QDialog(parent), Ui::DlgAboutDlg() {
             << "Sam Cross"
             << "Joey Pabalinas"
             << "Nimit Bhardwaj"
-            << "Pavel Sokolov";  
+            << "Pavel Sokolov"
+            << "Devananda van der Veen"
+            << "Tatsuyuki Ishi"
+            << "Kilian Feess"
+			<< "Conner Phillips"
+			<< "Daniel Poelzleithner"
+            << "Artyom Lyan"
+            << "Johan Lasperas"
+            << "Olaf Hering"
+            << "Stefan Weber";
 
     QStringList specialThanks;
     specialThanks
