@@ -1,4 +1,33 @@
 'use strict';
+
+
+NumarkNV = new Controller();
+NumarkNV.RateRanges = [0.08, 0.10, 0.30, 1.00];
+
+NumarkNV.Deck = Deck;
+NumarkNV.Deck.scratchMode = false;
+NumarkNV.Deck.rateRange = NumarkNV.RateRanges[1];
+
+NumarkNV.Deck.prototype.rateRangeHandler = function(value){
+  if(value == ButtonState.pressed) {
+    var i;
+    for(i=0; i < NumarkNV.RateRanges.length; i++){
+      if(NumarkNV.RateRanges[i] == this.rateRange) {
+        break;
+      }
+    }
+    // Found correct value increment by one
+    i++;
+
+    // Wrap if needed
+    if(i == NumarkNV.RateRanges.length) {
+      i = 0;
+    }
+
+    this.rateRange = NumarkNV.RateRanges[i];
+  }
+}
+
 /* *******************************************
  * = Configration Options
  ********************************************/
