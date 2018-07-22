@@ -13,10 +13,10 @@ var multiPressTimeout = 50; // Multi press time out. milisecs.
 /**************************
  * Constants for scratching :
  **************************/
-var intervalsPerRev = 1200, // or 556
-  rpm = 33 + 1 / 3, //Like a real vinyl !!! :)
-  alpha = 1 / 8, //Adjust to suit.
-  beta = alpha / 32; //Adjust to suit.
+var intervalsPerRev = 5600; 
+var rpm = 33 + 1 / 3;
+var alpha = 1 / 8;
+var beta = alpha / 32;
 
 /********************************
 * Numark NV Controller Script.
@@ -155,8 +155,8 @@ numarkNV.Scratch = {
     numarkNV.Scratch.old_value = value
 
     if (engine.getParameter(group, 'play') == false) {
-      engine.scratchEnable(deck, intervalsPerRev, rpm, alpha, beta);
-      engine.scratchTick(deck, adjustedJog); // Scratch!
+      engine.scratchEnable(_deck, intervalsPerRev, rpm, alpha, beta);
+      engine.scratchTick(_deck, _adjustedJog); // Scratch!
       var _gammaInputRange = 13; // Max jog speed
       var _maxOutFraction = 0.8; // Where on the curve it should peak; 0.5 is half-way
       var _sensitivity = 0.5; // Adjustment gamma
@@ -1082,7 +1082,7 @@ numarkNV.shiftButton = function shiftButton(channel, control, value, status, gro
   }
   for (i = 0; i < channelsString.length - 1; i++) {
     for (j = 0; j < connectedFunctions.length - 1; j++) {
-      engine.connectControl(channelsString[i], 'ShiftedButtons.' + connectedFunctions[j]);
+      engine.connectControl(channelsString[i], 'ShiftedButtons.' + connectedFunctions[j], false);
     }
   }
   numarkNV.activeButtons = numarkNV.shiftedButton;
@@ -1098,7 +1098,7 @@ numarkNV.releaseShiftButton = function releaseShiftButton (channel, control, val
   }
   for (i = 0; i < channelsString.length - 1; i++) {
     for (j = 0; j < connectedFunctions.length - 1; j++) {
-      engine.connectControl(channelsString[i], 'unShiftedButtons.' + connectedFunctions[j]);
+      engine.connectControl(channelsString[i], 'unShiftedButtons.' + connectedFunctions[j], false);
     }
   }
   numarkNV.activeButtons = numarkNV.unShiftedButtons;
