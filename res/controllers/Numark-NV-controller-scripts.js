@@ -115,7 +115,7 @@ numarkNV.Scratch = {
   'old_value': 0,
 
   pushed: function pushed(channel, control, value, status, group) {
-    numarkNV.scratch[numarkNV.groupToDeck(group) - 1] = !numarkNV.Scratch.scratch_mode
+    numarkNV.Scratch.scratch_mode[numarkNV.groupToDeck(group) - 1] = !numarkNV.Scratch.scratch_mode
   },
 
   wheelTouch: function wheelTouch(channel, control, value, status, group) {;
@@ -174,7 +174,6 @@ numarkNV.Scratch = {
 numarkNV.rateKnob = function rateKnob(channel, control, value, status, group) {
   engine.setParameter(group, 'rate', value / 0x7F)
 }
-
 /*-----------------------------------------*/
 
 /* = Un Shift Button Section */
