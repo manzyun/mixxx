@@ -29,14 +29,12 @@ Also, only the following files are edited in this repository.
 
 ## Using Result
 
-Forgive me for being an amateur mix:
+Forgive me for being an amateur mix on Mixcloud:
 
-<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&feed=%2Fmanzyun%2Funknown-28%2F" frameborder="0" ></iframe>
-<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&feed=%2Fmanzyun%2Fglobal-game-jam-2019-in-spporo-morning-shot-mix-%2F" frameborder="0" ></iframe>
-<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Flove-for-the-music-laboratory-cube-has-gone-idle-mix%2F" frameborder="0" ></iframe>
-<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Ffavorite-songs-in-soundcloud-mix%2F" frameborder="0" ></iframe>
-<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Fkita-beats-vol1-retake-and-numark-nv-on-mixxx-test-drive%2F" frameborder="0" ></iframe>
-<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Fshort-summer-in-hokkaido-mix%2F" frameborder="0" ></iframe>
+- [unknown 28](https://www.mixcloud.com/manzyun/unknown-28/)
+- [Global Game Jam 2019 in Sapporo - Morning Shot Mix](https://www.mixcloud.com/manzyun/global-game-jam-2019-in-spporo-morning-shot-mix-/)
+- [Love for "the music Laboratyr cube" has gone idle Mix](https://www.mixcloud.com/manzyun/love-for-the-music-laboratory-cube-has-gone-idle-mix/)
+- [Kita! Beats vol.1 ReTake](https://www.mixcloud.com/manzyun/kita-beats-vol1-retake-and-numark-nv-on-mixxx-test-drive/)
 
 ---
 
