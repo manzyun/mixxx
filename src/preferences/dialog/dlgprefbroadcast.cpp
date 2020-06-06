@@ -6,6 +6,16 @@
 #include <QMessageBox>
 #include <QHeaderView>
 
+// shout.h checks for WIN32 to see if we are on Windows
+#ifdef WIN64
+#define WIN32
+#endif
+// this is needed to define SHOUT_META_* macros used in version guard
+#include <shout/shout.h>
+#ifdef WIN64
+#undef WIN32
+#endif
+
 #include "broadcast/defs_broadcast.h"
 #include "control/controlproxy.h"
 #include "defs_urls.h"
@@ -39,6 +49,21 @@ DlgPrefBroadcast::DlgPrefBroadcast(QWidget *parent,
     groupPasswordStorage->setVisible(false);
 #endif
 
+#ifndef SHOUT_META_IRC
+    stream_IRC_label->setVisible(false);
+    stream_IRC->setVisible(false);
+#endif
+
+#ifndef SHOUT_META_AIM
+    stream_AIM_label->setVisible(false);
+    stream_AIM->setVisible(false);
+#endif
+
+#ifndef SHOUT_META_ICQ
+    stream_ICQ_label->setVisible(false);
+    stream_ICQ->setVisible(false);
+#endif
+
     connect(connectionList->horizontalHeader(), SIGNAL(sectionResized(int, int, int)),
             this, SLOT(onSectionResized()));
 
@@ -64,8 +89,8 @@ DlgPrefBroadcast::DlgPrefBroadcast(QWidget *parent,
 
     m_pBroadcastEnabled = new ControlProxy(
             BROADCAST_PREF_KEY, "enabled", this);
-    m_pBroadcastEnabled->connectValueChanged(
-            SLOT(broadcastEnabledChanged(double)));
+    m_pBroadcastEnabled->connectValueChanged(this,
+            &DlgPrefBroadcast::broadcastEnabledChanged);
 
     //Server type combobox
     comboBoxServerType->addItem(tr("Icecast 2"), BROADCAST_SERVER_ICECAST2);
@@ -95,6 +120,9 @@ DlgPrefBroadcast::DlgPrefBroadcast(QWidget *parent,
      // Encoding format combobox
      comboBoxEncodingFormat->addItem(tr("MP3"), BROADCAST_FORMAT_MP3);
      comboBoxEncodingFormat->addItem(tr("Ogg Vorbis"), BROADCAST_FORMAT_OV);
+#ifdef __OPUS__
+     comboBoxEncodingFormat->addItem(tr("Opus"), BROADCAST_FORMAT_OPUS);
+#endif
 
      // Encoding channels combobox
      comboBoxEncodingChannels->addItem(tr("Automatic"),
@@ -142,7 +170,7 @@ void DlgPrefBroadcast::slotUpdate() {
 }
 
 void DlgPrefBroadcast::applyModel() {
-    if(m_pProfileListSelection) {
+    if (m_pProfileListSelection) {
         setValuesToProfile(m_pProfileListSelection);
     }
     m_pBroadcastSettings->applyModel(m_pSettingsModel);
@@ -163,20 +191,25 @@ void DlgPrefBroadcast::slotApply() {
 
         QString profileName = profile->getProfileName();
         QString profileMountpoint = profile->getMountpoint();
-        if (mountpoints.values().contains(profileMountpoint)) {
-            QString profileNameWithSameMountpoint = mountpoints.key(profileMountpoint);
-            BroadcastProfilePtr profileWithSameMountpoint =
-                m_pSettingsModel->getProfileByName(profileNameWithSameMountpoint);
 
-            if (!profileWithSameMountpoint.isNull()
-                && profileWithSameMountpoint->getHost().toLower()
-                    == profile->getHost().toLower()) {
-                QMessageBox::warning(
-                    this, tr("Action failed"),
-                    tr("'%1' has the same Icecast mountpoint as '%2'.\n"
-                       "Two source connections to the same server can't have the same mountpoint.")
-                       .arg(profileName).arg(profileNameWithSameMountpoint));
-                return;
+        for (auto it = mountpoints.constBegin(); it != mountpoints.constEnd(); ++it) {
+            if (it.value() == profileMountpoint) {
+                QString profileNameWithSameMountpoint = it.key();
+                BroadcastProfilePtr profileWithSameMountpoint =
+                        m_pSettingsModel->getProfileByName(profileNameWithSameMountpoint);
+
+                if (!profileWithSameMountpoint.isNull()
+                    && profileWithSameMountpoint->getHost().toLower()
+                    == profile->getHost().toLower()
+                    && profileWithSameMountpoint->getPort()
+                    == profile->getPort() ) {
+                    QMessageBox::warning(
+                        this, tr("Action failed"),
+                        tr("'%1' has the same Icecast mountpoint as '%2'.\n"
+                           "Two source connections to the same server can't have the same mountpoint.")
+                        .arg(profileName).arg(profileNameWithSameMountpoint));
+                    return;
+                }
             }
         }
 
@@ -185,7 +218,7 @@ void DlgPrefBroadcast::slotApply() {
 
     applyModel();
     bool broadcastingEnabled = m_pBroadcastEnabled->toBool();
-    if(!broadcastingEnabled && connectOnApply->isChecked()) {
+    if (!broadcastingEnabled && connectOnApply->isChecked()) {
         m_pBroadcastEnabled->set(true);
 
         // Reset state of "Connect on Apply" checkbox
@@ -231,13 +264,13 @@ void DlgPrefBroadcast::enableCustomMetadataChanged(int value) {
 }
 
 void DlgPrefBroadcast::btnCreateConnectionClicked() {
-    if(m_pSettingsModel->rowCount() >= BROADCAST_MAX_CONNECTIONS) {
+    if (m_pSettingsModel->rowCount() >= BROADCAST_MAX_CONNECTIONS) {
         QMessageBox::warning(this, tr("Action failed"),
                 tr("You can't create more than %1 source connections.")
                 .arg(BROADCAST_MAX_CONNECTIONS));
         return;
     }
-  
+
     int profileNumber = m_pSettingsModel->rowCount();
 
     // Generate a new profile name based on the current profile count.
@@ -251,7 +284,7 @@ void DlgPrefBroadcast::btnCreateConnectionClicked() {
     } while(!existingProfile.isNull());
 
     BroadcastProfilePtr newProfile(new BroadcastProfile(newName));
-    if(m_pProfileListSelection) {
+    if (m_pProfileListSelection) {
         m_pProfileListSelection->copyValuesTo(newProfile);
     }
     m_pSettingsModel->addProfileToModel(newProfile);
@@ -265,7 +298,7 @@ void DlgPrefBroadcast::connectionListItemSelected(const QModelIndex& selected) {
             Qt::DisplayRole).toString();
     BroadcastProfilePtr profile =
             m_pSettingsModel->getProfileByName(selectedName);
-    if(profile) {
+    if (profile) {
         getValuesFromProfile(profile);
         m_pProfileListSelection = profile;
     }
@@ -275,12 +308,12 @@ void DlgPrefBroadcast::updateModel() {
     // Resetting the model will clear the current list selection
     // so store the name of the current selection before resetting
     QString selected("");
-    if(m_pProfileListSelection) {
+    if (m_pProfileListSelection) {
         selected = m_pProfileListSelection->getProfileName();
     }
 
     m_pSettingsModel->resetFromSettings(m_pBroadcastSettings);
-    if(!selected.isEmpty()) {
+    if (!selected.isEmpty()) {
         // Restore previous selection with the name fetched before
         selectConnectionRowByName(selected);
     }
@@ -322,7 +355,7 @@ void DlgPrefBroadcast::selectConnectionRowByName(QString rowName) {
 }
 
 void DlgPrefBroadcast::getValuesFromProfile(BroadcastProfilePtr profile) {
-    if(!profile) {
+    if (!profile) {
         return;
     }
 
@@ -387,6 +420,15 @@ void DlgPrefBroadcast::getValuesFromProfile(BroadcastProfilePtr profile) {
     // Stream website
     stream_website->setText(profile->getStreamWebsite());
 
+    // Stream IRC
+    stream_IRC->setText(profile->getStreamIRC());
+
+    // Stream AIM
+    stream_AIM->setText(profile->getStreamAIM());
+
+    // Stream ICQ
+    stream_ICQ->setText(profile->getStreamICQ());
+
     // Stream description
     stream_desc->setText(profile->getStreamDesc());
 
@@ -440,7 +482,7 @@ void DlgPrefBroadcast::getValuesFromProfile(BroadcastProfilePtr profile) {
 }
 
 void DlgPrefBroadcast::setValuesToProfile(BroadcastProfilePtr profile) {
-    if(!profile)
+    if (!profile)
         return;
 
     profile->setSecureCredentialStorage(rbPasswordKeychain->isChecked());
@@ -468,6 +510,9 @@ void DlgPrefBroadcast::setValuesToProfile(BroadcastProfilePtr profile) {
     profile->setMaximumRetries(spinBoxMaximumRetries->value());
     profile->setStreamName(stream_name->text());
     profile->setStreamWebsite(stream_website->text());
+    profile->setStreamIRC(stream_IRC->text());
+    profile->setStreamAIM(stream_AIM->text());
+    profile->setStreamICQ(stream_ICQ->text());
     profile->setStreamDesc(stream_desc->toPlainText());
     profile->setStreamGenre(stream_genre->text());
     profile->setStreamPublic(stream_public->isChecked());
@@ -494,26 +539,26 @@ void DlgPrefBroadcast::setValuesToProfile(BroadcastProfilePtr profile) {
 }
 
 void DlgPrefBroadcast::btnRemoveConnectionClicked() {
-    if(m_pSettingsModel->rowCount() < 2) {
+    if (m_pSettingsModel->rowCount() < 2) {
         QMessageBox::information(this, tr("Action failed"),
                 tr("At least one source connection is required."));
         return;
     }
 
-    if(m_pProfileListSelection) {
+    if (m_pProfileListSelection) {
         QString profileName = m_pProfileListSelection->getProfileName();
         auto response = QMessageBox::question(this, tr("Confirmation required"),
                     tr("Are you sure you want to delete '%1'?")
                     .arg(profileName), QMessageBox::Yes, QMessageBox::No);
 
-        if(response == QMessageBox::Yes) {
+        if (response == QMessageBox::Yes) {
             m_pSettingsModel->deleteProfileFromModel(m_pProfileListSelection);
         }
     }
 }
 
 void DlgPrefBroadcast::btnRenameConnectionClicked() {
-    if(m_pProfileListSelection) {
+    if (m_pProfileListSelection) {
         QString profileName = m_pProfileListSelection->getProfileName();
 
         bool ok = false;
@@ -521,9 +566,9 @@ void DlgPrefBroadcast::btnRenameConnectionClicked() {
                 QInputDialog::getText(this, tr("Renaming '%1'").arg(profileName),
                         tr("New name for '%1':").arg(profileName),
                         QLineEdit::Normal, profileName, &ok);
-        if(ok && newName != profileName) {
+        if (ok && newName != profileName) {
             BroadcastProfilePtr existingProfile = m_pSettingsModel->getProfileByName(newName);
-            if(!existingProfile) {
+            if (!existingProfile) {
                 // Requested name not used already
                 m_pProfileListSelection->setProfileName(newName);
                 getValuesFromProfile(m_pProfileListSelection);
@@ -543,7 +588,7 @@ void DlgPrefBroadcast::btnDisconnectAllClicked() {
             tr("Are you sure you want to disconnect every active source connection?"),
             QMessageBox::Yes, QMessageBox::No);
 
-    if(response == QMessageBox::Yes) {
+    if (response == QMessageBox::Yes) {
         m_pBroadcastEnabled->set(false);
         broadcastEnabledChanged(0.0);
     }
@@ -559,4 +604,3 @@ void DlgPrefBroadcast::onSectionResized() {
     // the remaining width, thanks to stretchLastSection set to true.
     sender()->blockSignals(false);
 }
-

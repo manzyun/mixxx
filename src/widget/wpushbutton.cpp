@@ -192,10 +192,11 @@ void WPushButton::setup(const QDomNode& node, const SkinContext& context) {
             if (p) {
                 m_rightButtonMode = p->getButtonMode();
                 if (m_rightButtonMode != ControlPushButton::PUSH &&
+                        m_rightButtonMode != ControlPushButton::TOGGLE &&
                         m_rightButtonMode != ControlPushButton::TRIGGER) {
                     SKIN_WARNING(node, context)
-                            << "WPushButton::setup: Connecting a Pushbutton not in PUSH or TRIGGER mode is not implemented\n"
-                            << "Please set <RightClickIsPushButton>true</RightClickIsPushButton>";
+                            << "WPushButton::setup: Connecting a Pushbutton not in PUSH, TRIGGER or TOGGLE mode is not implemented\n"
+                            << "Please consider to set <RightClickIsPushButton>true</RightClickIsPushButton>";
                 }
             }
         }
@@ -359,7 +360,7 @@ void WPushButton::mousePressEvent(QMouseEvent * e) {
 
     if (rightClick) {
         // This is the secondary button function always a Pushbutton
-        // due the leak of visual feedback we do not allow a toggle function
+        // due the lack of visual feedback we do not allow a toggle function
         if (m_rightButtonMode == ControlPushButton::PUSH ||
                 m_rightButtonMode == ControlPushButton::TRIGGER ||
                 m_iNoStates == 1) {
@@ -378,7 +379,7 @@ void WPushButton::mousePressEvent(QMouseEvent * e) {
             // or this is a push button.
             emitValue = 1.0;
         } else {
-            // Toggle thru the states
+            // Toggle through the states
             emitValue = getControlParameterLeft();
             if (!isnan(emitValue) && m_iNoStates > 0) {
                 emitValue = static_cast<int>(emitValue + 1.0) % m_iNoStates;
@@ -429,12 +430,12 @@ void WPushButton::mouseReleaseEvent(QMouseEvent * e) {
         // This is the secondary clickButton function,
         // due the leak of visual feedback we do not allow a toggle
         // function
+        m_bPressed = false;
         if (m_rightButtonMode == ControlPushButton::PUSH
                 || m_iNoStates == 1) {
-            m_bPressed = false;
             setControlParameterRightUp(0.0);
-            restyleAndRepaint();
         }
+        restyleAndRepaint();
         return;
     }
 

@@ -43,8 +43,8 @@ CrateFeature::CrateFeature(Library* pLibrary,
                            TrackCollection* pTrackCollection,
                            UserSettingsPointer pConfig)
         : LibraryFeature(pConfig),
-          m_cratesIcon(":/images/library/ic_library_crates.png"),
-          m_lockedCrateIcon(":/images/library/ic_library_locked.png"),
+          m_cratesIcon(":/images/library/ic_library_crates.svg"),
+          m_lockedCrateIcon(":/images/library/ic_library_locked_tracklist.svg"),
           m_pTrackCollection(pTrackCollection),
           m_crateTableModel(this, pTrackCollection) {
 
@@ -145,16 +145,14 @@ QString CrateFeature::formatRootViewHtml() const {
     QString html;
     QString createCrateLink = tr("Create New Crate");
     html.append(QString("<h2>%1</h2>").arg(cratesTitle));
-    html.append("<table border=\"0\" cellpadding=\"5\"><tr><td>");
     html.append(QString("<p>%1</p>").arg(cratesSummary));
     html.append(QString("<p>%1</p>").arg(cratesSummary2));
     html.append(QString("<p>%1</p>").arg(cratesSummary3));
-    html.append("</td><td rowspan=\"2\">");
-    html.append("<img src=\"qrc:/images/library/crates_art.png\">");
-    html.append("</td></tr>");
-    html.append(QString("<tr><td><a href=\"create\">%1</a>")
+    //Colorize links in lighter blue, instead of QT default dark blue.
+    //Links are still different from regular text, but readable on dark/light backgrounds.
+    //https://bugs.launchpad.net/mixxx/+bug/1744816
+    html.append(QString("<a style=\"color:#0496FF;\" href=\"create\">%1</a>")
                 .arg(createCrateLink));
-    html.append("</td></tr></table>");
     return html;
 }
 
@@ -256,7 +254,7 @@ TreeItemModel* CrateFeature::getChildModel() {
 
 void CrateFeature::activate() {
     emit(switchToView("CRATEHOME"));
-    emit(restoreSearch(QString())); //disable search on crate home
+    emit disableSearch();
     emit(enableCoverArtDisplay(true));
 }
 
@@ -555,7 +553,7 @@ void CrateFeature::slotImportPlaylist() {
     activateChild(m_lastRightClickedIndex);
 }
 
-void CrateFeature::slotImportPlaylistFile(const QString &playlist_file) {
+void CrateFeature::slotImportPlaylistFile(const QString& playlist_file) {
     // The user has picked a new directory via a file dialog. This means the
     // system sandboxer (if we are sandboxed) has granted us permission to this
     // folder. We don't need access to this file on a regular basis so we do not
@@ -661,7 +659,7 @@ void CrateFeature::slotExportPlaylist() {
 
     QString lastCrateDirectory = m_pConfig->getValue(
             ConfigKey("[Library]", "LastImportExportCrateDirectory"),
-            QDesktopServices::storageLocation(QDesktopServices::MusicLocation));
+            QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
 
     QString file_location = QFileDialog::getSaveFileName(
         NULL,
@@ -777,7 +775,7 @@ void CrateFeature::htmlLinkClicked(const QUrl& link) {
 }
 
 void CrateFeature::slotTrackSelected(TrackPointer pTrack) {
-    m_pSelectedTrack = pTrack;
+    m_pSelectedTrack = std::move(pTrack);
 
     TreeItem* pRootItem = m_childModel.getRootItem();
     VERIFY_OR_DEBUG_ASSERT(pRootItem != nullptr) {
@@ -786,8 +784,8 @@ void CrateFeature::slotTrackSelected(TrackPointer pTrack) {
 
     TrackId selectedTrackId;
     std::vector<CrateId> sortedTrackCrates;
-    if (pTrack) {
-        selectedTrackId = pTrack->getId();
+    if (m_pSelectedTrack) {
+        selectedTrackId = m_pSelectedTrack->getId();
         CrateTrackSelectResult trackCratesIter(
                 m_pTrackCollection->crates().selectTrackCratesSorted(selectedTrackId));
         while (trackCratesIter.next()) {

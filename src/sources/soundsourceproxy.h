@@ -10,16 +10,14 @@
 // in a narrow scope and not sharable between multiple threads!
 class SoundSourceProxy {
   public:
-    // Initially registers all built-in SoundSource providers and
-    // loads all SoundSource plugins with additional providers. This
-    // function is not thread-safe and must be called only once
-    // upon startup of the application.
-    static void loadPlugins();
+    // Initially registers all built-in SoundSource providers. This function is
+    // not thread-safe and must be called only once upon startup of the
+    // application.
+    static void registerSoundSourceProviders();
 
     static QStringList getSupportedFileExtensions() {
         return s_soundSourceProviders.getRegisteredFileExtensions();
     }
-    static QStringList getSupportedFileExtensionsByPlugins();
     static const QStringList& getSupportedFileNamePatterns() {
         return s_supportedFileNamePatterns;
     }
@@ -31,6 +29,15 @@ class SoundSourceProxy {
     static bool isFileSupported(const QFileInfo& fileInfo);
     static bool isFileNameSupported(const QString& fileName);
     static bool isFileExtensionSupported(const QString& fileExtension);
+
+    // The following import functions ensure that the file will not be
+    // written while reading it!
+    static TrackPointer importTemporaryTrack(
+            QFileInfo fileInfo,
+            SecurityTokenPointer pSecurityToken = SecurityTokenPointer());
+    static QImage importTemporaryCoverImage(
+            QFileInfo fileInfo,
+            SecurityTokenPointer pSecurityToken = SecurityTokenPointer());
 
     explicit SoundSourceProxy(
             TrackPointer pTrack);
@@ -88,10 +95,6 @@ class SoundSourceProxy {
     // the referenced track.
     mixxx::MetadataSource::ImportResult importTrackMetadata(mixxx::TrackMetadata* pTrackMetadata) const;
 
-    // Parse only the cover image from the file without modifying
-    // the referenced track.
-    QImage importCoverImage() const;
-
     // Opening the audio source through the proxy will update the
     // audio properties of the corresponding track object. Returns
     // a null pointer on failure.
@@ -105,13 +108,17 @@ class SoundSourceProxy {
     static QStringList s_supportedFileNamePatterns;
     static QRegExp s_supportedFileNamesRegex;
 
-    friend class TrackDAO;
+    friend class TrackCollection;
     static Track::ExportMetadataResult exportTrackMetadataBeforeSaving(Track* pTrack);
 
-    // Special case: Construction from a plain TIO pointer is needed
+    // Special case: Construction from a url is needed
     // for writing metadata immediately before the TIO is destroyed.
     explicit SoundSourceProxy(
-            const Track* pTrack);
+            const QUrl& url);
+
+    // Parse only the cover image from the file without modifying
+    // the referenced track.
+    QImage importCoverImage() const;
 
     const TrackPointer m_pTrack;
 

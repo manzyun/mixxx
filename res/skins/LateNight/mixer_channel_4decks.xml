@@ -1,7 +1,7 @@
 <Template>
   <SetVariable name="group">[Channel<Variable name="channum"/>]</SetVariable>
   <WidgetGroup>
-    <ObjectName>MixerChannel</ObjectName>
+    <ObjectName>MixerChannel_4Decks</ObjectName>
     <Layout>vertical</Layout>
     <SizePolicy>min,min</SizePolicy>
     <Children>
@@ -17,23 +17,13 @@
           <WidgetGroup>
             <Layout>vertical</Layout>
             <Children>
-              <PushButton>
-                <TooltipId>pfl</TooltipId>
-                <NumberStates>2</NumberStates>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_pfl_down.svg</Pressed>
-                  <Unpressed>buttons/btn_pfl.svg</Unpressed>
-                </State>
-                <State>
-                  <Number>1</Number>
-                  <Pressed>buttons/btn_pfl_overdown.svg</Pressed>
-                  <Unpressed>buttons/btn_pfl_over.svg</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,pfl</ConfigKey>
-                </Connection>
-              </PushButton>
+              <Template src="skin:button_2state.xml">
+                <SetVariable name="TooltipId">pfl</SetVariable>
+                <SetVariable name="icon">pfl</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,pfl</SetVariable>
+                <SetVariable name="Size">26,26</SetVariable>
+              </Template>
+
               <!-- Spacer to put the PFL button a little bit higher -->
               <WidgetGroup>
                 <Layout>vertical</Layout>
@@ -44,6 +34,7 @@
           </WidgetGroup>
           <Template src="skin:knob.xml">
             <SetVariable name="Size">40f,34f</SetVariable>
+            <SetVariable name="Color">orange</SetVariable>
             <SetVariable name="group"><Variable name="group"/></SetVariable>
             <SetVariable name="control">pregain</SetVariable>
             <SetVariable name="label">gain</SetVariable>
@@ -52,23 +43,39 @@
         </Children>
       </WidgetGroup>
 
-      <Template src="skin:eq_knob_left.xml">
+      <Template src="skin:eq_knob_4decks.xml">
         <SetVariable name="FxParameter">4</SetVariable>
       </Template>
 
-      <Template src="skin:eq_knob_left.xml">
+      <Template src="skin:eq_knob_4decks.xml">
         <SetVariable name="FxParameter">3</SetVariable>
       </Template>
 
-      <Template src="skin:eq_knob_left.xml">
+      <Template src="skin:eq_knob_4decks.xml">
         <SetVariable name="FxParameter">2</SetVariable>
       </Template>
 
-      <Template src="skin:eq_knob_left.xml">
+      <Template src="skin:eq_knob_4decks.xml">
         <SetVariable name="FxParameter">1</SetVariable>
       </Template>
 
-      <Template src="skin:quick_effect_knob_left.xml"/>
+      <Template src="skin:quick_effect_knob_4decks.xml"/>
+
+      <WidgetGroup>
+        <ObjectName>CrossfaderSwitch4Decks</ObjectName>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Template src="skin:button_3state.xml">
+            <SetVariable name="TooltipId">orientation</SetVariable>
+            <SetVariable name="Size">34f,15f</SetVariable>
+            <SetVariable name="state_0">orientation_deck<Variable name="deckSide"/>_left</SetVariable>
+            <SetVariable name="state_1">orientation_deck_master</SetVariable>
+            <SetVariable name="state_2">orientation_deck<Variable name="deckSide"/>_right</SetVariable>
+            <SetVariable name="ConfigKey"><Variable name="group"/>,orientation</SetVariable>
+          </Template>
+        </Children>
+      </WidgetGroup>
 
       <!-- Spacer when there's no 4th EQ AND no QuickEffect loaded -->
       <WidgetGroup>
@@ -94,7 +101,7 @@
       </WidgetGroup>
 
       <WidgetGroup>
-        <ObjectName>VuAndSlider</ObjectName>
+        <ObjectName>VuAndSlider4decks</ObjectName>
         <Layout>horizontal</Layout>
         <Children>
           <WidgetGroup>
@@ -105,16 +112,16 @@
             <Children>
               <StatusLight>
                 <TooltipId>channel_PeakIndicator</TooltipId>
-                <PathStatusLight>buttons/btn_clipping1_over.png</PathStatusLight>
-                <PathBack>buttons/btn_clipping1.png</PathBack>
+                <PathStatusLight>style/clipping_deck_over.png</PathStatusLight>
+                <PathBack>style/clipping_deck.png</PathBack>
                 <Connection>
                   <ConfigKey><Variable name="group"/>,PeakIndicator</ConfigKey>
                 </Connection>
               </StatusLight>
               <VuMeter>
                 <TooltipId>channel_VuMeter</TooltipId>
-                <PathVu>buttons/btn_volume_display1_over.png</PathVu>
-                <PathBack>buttons/btn_volume_display1.png</PathBack>
+                <PathVu>style/volume_display_deck_over.png</PathVu>
+                <PathBack>style/volume_display_deck.png</PathBack>
                 <Horizontal>false</Horizontal>
                 <PeakHoldSize>5</PeakHoldSize>
                 <PeakHoldTime>500</PeakHoldTime>
@@ -129,8 +136,8 @@
 
           <SliderComposed>
             <TooltipId>channel_volume</TooltipId>
-            <Handle>knob_volume1.png</Handle>
-            <Slider>slider_volume1.png</Slider>
+            <Handle scalemode="STRETCH_ASPECT">knob_volume_deck.svg</Handle>
+            <Slider>slider_volume_deck.svg</Slider>
             <Horizontal>false</Horizontal>
             <Connection>
               <ConfigKey><Variable name="group"/>,volume</ConfigKey>

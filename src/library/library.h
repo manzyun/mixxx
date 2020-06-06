@@ -28,16 +28,15 @@ class LibraryFeature;
 class LibraryTableModel;
 class WLibrarySidebar;
 class WLibrary;
-class WSearchLineEdit;
 class MixxxLibraryFeature;
 class PlaylistFeature;
 class CrateFeature;
 class LibraryControl;
 class KeyboardEventFilter;
-class PlayerManagerInterface;
+class PlayerManager;
 
 class Library: public QObject,
-    public virtual /*implements*/ GlobalTrackCacheEvictor {
+    public virtual /*implements*/ GlobalTrackCacheSaver {
     Q_OBJECT
 
   public:
@@ -48,12 +47,19 @@ class Library: public QObject,
     Library(QObject* parent,
             UserSettingsPointer pConfig,
             mixxx::DbConnectionPoolPtr pDbConnectionPool,
-            PlayerManagerInterface* pPlayerManager,
+            PlayerManager* pPlayerManager,
             RecordingManager* pRecordingManager);
     ~Library() override;
 
+    void stopFeatures();
+
     mixxx::DbConnectionPoolPtr dbConnectionPool() const {
         return m_pDbConnectionPool;
+    }
+
+    TrackCollection& trackCollection() {
+        DEBUG_ASSERT(m_pTrackCollection);
+        return *m_pTrackCollection;
     }
 
     void bindWidget(WLibrary* libraryWidget,
@@ -81,7 +87,9 @@ class Library: public QObject,
 
     static const int kDefaultRowHeightPx;
 
-    void onEvictingTrackFromCache(GlobalTrackCacheLocker* pCacheLocker, Track* pTrack) override;
+    void setFont(const QFont& font);
+    void setRowHeight(int rowHeight);
+    void setEditMedatataSelectedClick(bool enable);
 
   public slots:
     void slotShowTrackModel(QAbstractItemModel* model);
@@ -90,6 +98,7 @@ class Library: public QObject,
     void slotLoadTrackToPlayer(TrackPointer pTrack, QString group, bool play);
     void slotLoadLocationToPlayer(QString location, QString group);
     void slotRestoreSearch(const QString& text);
+    void slotDisableSearch();
     void slotRefreshLibraryModels();
     void slotCreatePlaylist();
     void slotCreateCrate();
@@ -97,8 +106,6 @@ class Library: public QObject,
     void slotRequestRemoveDir(QString directory, Library::RemovalType removalType);
     void slotRequestRelocateDir(QString previousDirectory, QString newDirectory);
     void onSkinLoadFinished();
-    void slotSetTrackTableFont(const QFont& font);
-    void slotSetTrackTableRowHeight(int rowHeight);
 
     void scan() {
         m_scanner.scan();
@@ -111,20 +118,27 @@ class Library: public QObject,
     void loadTrackToPlayer(TrackPointer pTrack, QString group, bool play = false);
     void restoreSearch(const QString&);
     void search(const QString& text);
-    void searchCleared();
-    void searchStarting();
+    void disableSearch();
     // emit this signal to enable/disable the cover art widget
     void enableCoverArtDisplay(bool);
     void trackSelected(TrackPointer pTrack);
 
     void setTrackTableFont(const QFont& font);
     void setTrackTableRowHeight(int rowHeight);
+    void setSelectedClick(bool enable);
 
     // Emitted when a library scan starts and finishes.
     void scanStarted();
     void scanFinished();
 
+  private slots:
+      void onPlayerManagerTrackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
+      void onPlayerManagerTrackAnalyzerIdle();
+
   private:
+    // Callback for GlobalTrackCache
+    void saveCachedTrack(Track* pTrack) noexcept override;
+
     const UserSettingsPointer m_pConfig;
 
     // The Mixxx database connection pool
@@ -143,6 +157,7 @@ class Library: public QObject,
     LibraryScanner m_scanner;
     QFont m_trackTableFont;
     int m_iTrackTableRowHeight;
+    bool m_editMetadataSelectedClick;
     QScopedPointer<ControlObject> m_pKeyNotation;
 };
 

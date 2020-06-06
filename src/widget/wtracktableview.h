@@ -47,8 +47,6 @@ class WTrackTableView : public WLibraryTableView {
     void slotMouseDoubleClicked(const QModelIndex &);
     void slotUnhide();
     void slotPurge();
-    void onSearchStarting();
-    void onSearchCleared();
     void slotSendToAutoDJBottom() override;
     void slotSendToAutoDJTop() override;
     void slotSendToAutoDJReplace() override;
@@ -89,7 +87,7 @@ class WTrackTableView : public WLibraryTableView {
     // Signalled 20 times per second (every 50ms) by GuiTick.
     void slotGuiTick50ms(double);
     void slotScrollValueChanged(int);
-    void slotCoverInfoSelected(const CoverInfo& coverInfo);
+    void slotCoverInfoSelected(const CoverInfoRelative& coverInfo);
     void slotReloadCoverArt();
 
     void slotTrackInfoClosed();
@@ -167,6 +165,8 @@ class WTrackTableView : public WLibraryTableView {
 
     // Remove from table
     QAction *m_pRemoveAct;
+    QAction *m_pRemovePlaylistAct;
+    QAction *m_pRemoveCrateAct;
     QAction *m_pHideAct;
     QAction *m_pUnhideAct;
     QAction *m_pPurgeAct;

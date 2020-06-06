@@ -55,8 +55,9 @@ private:
         return m_waveformWidget;
     }
     //direct access to let factory sync/set default zoom
-    void setZoom(int zoom);
-    void setDisplayBeatGrid(bool set);
+    void setZoom(double zoom);
+    void setDisplayBeatGridAlpha(int alpha);
+    void setPlayMarkerPosition(double position);
 
 private:
     const char* m_pGroup;

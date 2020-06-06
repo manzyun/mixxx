@@ -23,6 +23,7 @@
     (TAGLIB_MAJOR_VERSION > 1) || ((TAGLIB_MAJOR_VERSION == 1) && (TAGLIB_MINOR_VERSION >= 10))
 
 #include <QImage>
+#include <QFile>
 
 #include "track/trackmetadata.h"
 
@@ -60,9 +61,21 @@ void importCoverImageFromMP4Tag(QImage* pCoverArt, const TagLib::MP4::Tag& tag);
 QImage importCoverImageFromVorbisCommentPictureList(const TagLib::List<TagLib::FLAC::Picture*>& pictures);
 
 // Low-level tag read/write functions are exposed only for testing purposes!
+
+// Bitmask of optional tag fields that should NOT be read from the
+// common part of the tag through TagLib::Tag.
+// Usage: The write functions for ID3v2, MP4, APE and XiphComment tags
+// have specialized code for some or all of the corresponding tag fields
+// and the common implementation sometime doesn't work as expected.
+enum ReadTagMask {
+    READ_TAG_OMIT_NONE         = 0x00,
+    READ_TAG_OMIT_COMMENT      = 0x01,
+};
+
 void importTrackMetadataFromTag(
         TrackMetadata* pTrackMetadata,
-        const TagLib::Tag& tag);
+        const TagLib::Tag& tag,
+        int readMask = READ_TAG_OMIT_NONE);
 void importTrackMetadataFromID3v2Tag(
         TrackMetadata* pTrackMetadata,
         const TagLib::ID3v2::Tag& tag);
@@ -116,7 +129,7 @@ static_assert(sizeof(wchar_t) == sizeof(QChar), "wchar_t is not the same size th
 // Note: we cannot use QString::toStdWString since QT 4 is compiled with
 // '/Zc:wchar_t-' flag and QT 5 not
 #else
-#define TAGLIB_FILENAME_FROM_QSTRING(fileName) (fileName).toLocal8Bit().constData()
+#define TAGLIB_FILENAME_FROM_QSTRING(fileName) QFile::encodeName(fileName).constData()
 #endif // _WIN32
 
 // Some helper functions for backwards compatibility with older

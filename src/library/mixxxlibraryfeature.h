@@ -42,6 +42,10 @@ class MixxxLibraryFeature : public LibraryFeature {
     void bindWidget(WLibrary* pLibrary,
                     KeyboardEventFilter* pKeyboard);
 
+    bool hasTrackTable() override {
+        return true;
+    }
+
   public slots:
     void activate();
     void activateChild(const QModelIndex& index);
@@ -59,6 +63,7 @@ class MixxxLibraryFeature : public LibraryFeature {
     TrackDAO& m_trackDao;
     UserSettingsPointer m_pConfig;
     TrackCollection* m_pTrackCollection;
+    QIcon m_icon;
 };
 
 #endif /* MIXXXLIBRARYFEATURE_H */

@@ -1,11 +1,23 @@
 <Template>
   <WidgetGroup>
-    <ObjectName>DeckRowFive</ObjectName>
+    <ObjectName>DeckRow_4_OverviewSpinny</ObjectName>
     <Layout>horizontal</Layout>
     <SizePolicy>me,me</SizePolicy>
     <Children>
-
-      <Template src="skin:spinny.xml"/>
+      <WidgetGroup>
+        <SizePolicy>max,min</SizePolicy>
+        <MaximumSize>54,-1</MaximumSize>
+        <Layout>horizontal</Layout>
+        <Children>
+          <Template src="skin:spinny_small.xml"/>
+          <Template src="skin:deck_coverArt_small.xml"/>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Skin],show_big_spinny_coverart</ConfigKey>
+          <Transform><Not/></Transform>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
 
       <Overview>
         <TooltipId>waveform_overview</TooltipId>
@@ -51,7 +63,7 @@
         </Mark>
         <Mark>
           <Control>cue_point</Control>
-          <Text>C</Text>
+          <Text> C </Text>
           <Align>top|right</Align>
           <Color>#FF001C</Color>
           <TextColor>#FFFFFF</TextColor>
@@ -61,132 +73,91 @@
         </Connection>
       </Overview>
 
+      <!-- Deck controls + Star rating -->
       <WidgetGroup>
-        <ObjectName>ToolbarButtons</ObjectName>
-        <Layout>horizontal</Layout>
+        <ObjectName>DeckControls</ObjectName>
+        <Layout>vertical</Layout>
         <Children>
+
+          <WidgetGroup><Size>0min,0me</Size></WidgetGroup>
+
           <WidgetGroup>
-            <ObjectName>ToggleRowOne</ObjectName>
+            <ObjectName>Stars</ObjectName>
             <Layout>vertical</Layout>
+            <Size>-1min,17me</Size>
             <Children>
-
-              <PushButton>
-                <TooltipId>slip_mode</TooltipId>
-                <NumberStates>2</NumberStates>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_slip.png</Pressed>
-                  <Unpressed>buttons/btn_slip.png</Unpressed>
-                </State>
-                <State>
-                  <Number>1</Number>
-                  <Pressed>buttons/btn_slip_over.png</Pressed>
-                  <Unpressed>buttons/btn_slip_over.png</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,slip_enabled</ConfigKey>
-                </Connection>
-              </PushButton>
-
-              <PushButton>
-                <TooltipId>repeat</TooltipId>
-                <NumberStates>2</NumberStates>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_repeat2.png</Pressed>
-                  <Unpressed>buttons/btn_repeat2.png</Unpressed>
-                </State>
-                <State>
-                  <Number>1</Number>
-                  <Pressed>buttons/btn_repeat2_over.png</Pressed>
-                  <Unpressed>buttons/btn_repeat2_over.png</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,repeat</ConfigKey>
-                </Connection>
-              </PushButton>
-
-              <PushButton>
-                <TooltipId>eject</TooltipId>
-                <Style></Style>
-                <NumberStates>1</NumberStates>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_eject2_over.png</Pressed>
-                  <Unpressed>buttons/btn_eject2.png</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,eject</ConfigKey>
-                  <ButtonState>LeftButton</ButtonState>
-                </Connection>
-              </PushButton>
-
+              <StarRating>
+                <Size>-1min,15f</Size>
+                <Alignment>center</Alignment>
+                <TooltipId>starrating</TooltipId>
+                <Channel><Variable name="channum"/></Channel>
+              </StarRating>
             </Children>
           </WidgetGroup>
 
+          <WidgetGroup><Size>0min,0me</Size></WidgetGroup>
+
+          <!-- Deck controls row 1 -->
           <WidgetGroup>
-            <Layout>vertical</Layout>
+            <Layout>horizontal</Layout>
             <Children>
-              <PushButton>
-                <TooltipId>beats_translate_curpos</TooltipId>
-                <NumberStates>1</NumberStates>
-                <RightClickIsPushButton>true</RightClickIsPushButton>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_beat_curpos_over.png</Pressed>
-                  <Unpressed>buttons/btn_beat_curpos.png</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,beats_translate_curpos</ConfigKey>
-                  <EmitOnPressAndRelease>true</EmitOnPressAndRelease>
-                  <ButtonState>LeftButton</ButtonState>
-                </Connection>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,beats_translate_match_alignment</ConfigKey>
-                  <EmitOnPressAndRelease>true</EmitOnPressAndRelease>
-                  <ButtonState>RightButton</ButtonState>
-                </Connection>
-              </PushButton>
 
-              <PushButton>
-                <TooltipId>quantize</TooltipId>
-                <NumberStates>2</NumberStates>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_quantize2.png</Pressed>
-                  <Unpressed>buttons/btn_quantize2.png</Unpressed>
-                </State>
-                <State>
-                  <Number>1</Number>
-                  <Pressed>buttons/btn_quantize2_over.png</Pressed>
-                  <Unpressed>buttons/btn_quantize2_over.png</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,quantize</ConfigKey>
-                  <ButtonState>LeftButton</ButtonState>
-                </Connection>
-              </PushButton>
+              <Template src="skin:button_2state_nohover.xml">
+                <SetVariable name="TooltipId">slip_mode</SetVariable>
+                <SetVariable name="icon">slip</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,slip_enabled</SetVariable>
+                <SetVariable name="Size">25,18</SetVariable>
+              </Template>
 
-              <PushButton>
-                <TooltipId>keylock</TooltipId>
-                <NumberStates>2</NumberStates>
-                <State>
-                  <Number>0</Number>
-                  <Pressed>buttons/btn_keylock2.png</Pressed>
-                  <Unpressed>buttons/btn_keylock2.png</Unpressed>
-                </State>
-                <State>
-                  <Number>1</Number>
-                  <Pressed>buttons/btn_keylock2_over.png</Pressed>
-                  <Unpressed>buttons/btn_keylock2_over.png</Unpressed>
-                </State>
-                <Connection>
-                  <ConfigKey><Variable name="group"/>,keylock</ConfigKey>
-                </Connection>
-              </PushButton>
+              <Template src="skin:button_2state_nohover.xml">
+                <SetVariable name="TooltipId">quantize</SetVariable>
+                <SetVariable name="icon">quantize</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,quantize</SetVariable>
+                <SetVariable name="Size">25,18</SetVariable>
+              </Template>
+
+              <Template src="skin:button_1state_right.xml">
+                <SetVariable name="TooltipId">beats_translate_curpos</SetVariable>
+                <SetVariable name="state_0_unpressed">beat_curpos</SetVariable>
+                <SetVariable name="state_0_pressed">beat_curpos_over</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,beats_translate_curpos</SetVariable>
+                <SetVariable name="ConfigKeyRight"><Variable name="group"/>,beats_translate_match_alignment</SetVariable>
+                <SetVariable name="Size">25,18</SetVariable>
+              </Template>
 
             </Children>
-          </WidgetGroup> <!-- /Channel1 Toggle Buttons -->
+          </WidgetGroup><!-- Deck controls row 1 -->
+
+          <!-- Deck controls row 2 -->
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <Children>
+              <Template src="skin:button_2state_nohover.xml">
+                <SetVariable name="TooltipId">eject</SetVariable>
+                <SetVariable name="icon">eject</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,eject</SetVariable>
+                <SetVariable name="Size">25,18</SetVariable>
+              </Template>
+
+              <Template src="skin:button_2state_nohover.xml">
+                <SetVariable name="TooltipId">repeat</SetVariable>
+                <SetVariable name="icon">repeat</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,repeat</SetVariable>
+                <SetVariable name="Size">25,18</SetVariable>
+              </Template>
+
+              <Template src="skin:button_2state_nohover.xml">
+                <SetVariable name="TooltipId">keylock</SetVariable>
+                <SetVariable name="icon">keylock</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="group"/>,keylock</SetVariable>
+                <SetVariable name="Size">25,18</SetVariable>
+              </Template>
+
+            </Children>
+          </WidgetGroup><!-- /Deck controls row 2 -->
+
+          <WidgetGroup><Size>0min,0me</Size></WidgetGroup>
+
         </Children>
       </WidgetGroup>
     </Children>

@@ -84,10 +84,6 @@
                 <SizePolicy>min,me</SizePolicy>
                 <Children>
 
-                  <Template src="skin:spacer_vx.xml">
-                    <SetVariable name="height">,0f</SetVariable>
-                  </Template>
-
                   <WidgetGroup>
                     <Layout>horizontal</Layout>
                     <SizePolicy>min,min</SizePolicy>
@@ -99,13 +95,10 @@
                     </Children>
                   </WidgetGroup>
 
-                  <Template src="skin:spacer_vx.xml">
-                    <SetVariable name="height">,2f</SetVariable>
-                  </Template>
+                  <WidgetGroup><Size>0min,2f</Size></WidgetGroup>
 
                   <PushButton>
-                    <!-- TODO(jus): Add missing string to src/skin/tooltips.cpp -->
-                    <TooltipId></TooltipId>
+                    <TooltipId>talkover_duck_mode</TooltipId>
                     <Size>66f,20f</Size>
                     <NumberStates>3</NumberStates>
                     <State>
@@ -126,9 +119,7 @@
                     </Connection>
                   </PushButton>
 
-                  <Template src="skin:spacer_vx.xml">
-                    <SetVariable name="height">,2me</SetVariable>
-                  </Template>
+                  <WidgetGroup><Size>0min,2me</Size></WidgetGroup>
                 </Children>
               </WidgetGroup>
 
@@ -146,8 +137,7 @@
                       <Template src="skin:knob.xml">
                         <SetVariable name="group">[Master]</SetVariable>
                         <SetVariable name="control">duckStrength</SetVariable>
-                        <!-- TODO(jus): Add missing string to src/skin/tooltips.cpp -->
-                        <SetVariable name="TooltipId"></SetVariable>
+                        <SetVariable name="TooltipId">talkover_duck_strength</SetVariable>
                         <SetVariable name="color">blue</SetVariable>
                       </Template>
                     </Children>

@@ -39,7 +39,8 @@ BaseTrackCache::BaseTrackCache(TrackCollection* pTrackCollection,
                     << "grouping"
                     << "comment"
                     << "title"
-                    << "genre";
+                    << "genre"
+                    << "crate";
 
     // Convert all the search column names to their field indexes because we use
     // them a bunch.
@@ -141,29 +142,24 @@ void BaseTrackCache::setSearchColumns(const QStringList& columns) {
     m_searchColumns = columns;
 }
 
-TrackPointer BaseTrackCache::getRecentTrack(TrackId trackId) const {
+const TrackPointer& BaseTrackCache::getRecentTrack(TrackId trackId) const {
     DEBUG_ASSERT(m_bIsCaching);
     // Only refresh the recently used track if the identifiers
     // don't match. Otherwise simply return the corresponding
     // pointer to avoid accessing and locking the global track
     // cache excessively.
     if (m_recentTrackId != trackId) {
-        refreshRecentTrack(std::move(trackId));
+        if (trackId.isValid()) {
+            TrackPointer trackPtr =
+                    GlobalTrackCacheLocker().lookupTrackById(trackId);
+            replaceRecentTrack(
+                    std::move(trackId),
+                    std::move(trackPtr));
+        } else {
+            resetRecentTrack();
+        }
     }
     return m_recentTrackPtr;
-}
-
-void BaseTrackCache::refreshRecentTrack(TrackId trackId) const {
-    DEBUG_ASSERT(m_bIsCaching);
-    if (trackId.isValid()) {
-        auto trackPtr =
-                GlobalTrackCache::instance().lookupById(trackId).getTrack();
-        replaceRecentTrack(
-                std::move(trackId),
-                std::move(trackPtr));
-    } else {
-        resetRecentTrack();
-    }
 }
 
 void BaseTrackCache::replaceRecentTrack(TrackPointer pTrack) const {
@@ -180,7 +176,27 @@ void BaseTrackCache::replaceRecentTrack(TrackId trackId, TrackPointer pTrack) co
     if (m_recentTrackId.isValid()) {
         if (pTrack) {
             DEBUG_ASSERT(m_recentTrackId == pTrack->getId());
-            m_recentTrackPtr = std::move(pTrack);
+
+            // NOTE(uklotzde, 2018-02-07, Fedora 27, GCC 7.3.1, optimize=native (-O3), Core i5-6440HQ)
+            // Using the move assignment operator here will sooner or later
+            // store a nullptr in m_recentTrackPtr even if both m_recentTrackPtr
+            // and pTrack contain a valid but different pointer before the
+            // assignment and the custom deleter is invoked on m_recentTrackPtr
+            // during the assignment. The issue does not occur when either
+            // changing the optimization level from 'native' to 'none' or
+            // when replacing the move assignment with a swap operation (see below).
+            //
+            // Fucked up by the optimizer:
+            // m_recentTrackPtr = std::move(pTrack);
+            //
+            // The workaround:
+            m_recentTrackPtr.swap(pTrack);
+            //
+            // The following debug assertion will be triggered eventually
+            // without the workaround in place when browsing and editing
+            // properties of tracks.
+            DEBUG_ASSERT(m_recentTrackPtr);
+
             if (m_recentTrackPtr->isDirty()) {
                 m_dirtyTracks.insert(m_recentTrackId);
             } else {
@@ -219,7 +235,7 @@ bool BaseTrackCache::updateIndexWithTrackpointer(TrackPointer pTrack) {
         // m_trackInfo[id] will insert a QVector<QVariant> into the
         // m_trackInfo HashTable with the key "id"
         QVector<QVariant>& record = m_trackInfo[trackId];
-        // prealocate memory for all columns at once
+        // preallocate memory for all columns at once
         record.resize(numColumns);
         for (int i = 0; i < numColumns; ++i) {
             getTrackValueForColumn(pTrack, i, record[i]);
@@ -316,8 +332,8 @@ void BaseTrackCache::updateTrackInIndex(TrackId trackId) {
     updateTracksInIndex(trackIds);
 }
 
-void BaseTrackCache::updateTracksInIndex(QSet<TrackId> trackIds) {
-    if (trackIds.size() == 0) {
+void BaseTrackCache::updateTracksInIndex(const QSet<TrackId>& trackIds) {
+    if (trackIds.isEmpty()) {
         return;
     }
 
@@ -436,9 +452,8 @@ QVariant BaseTrackCache::data(TrackId trackId, int column) const {
     // metadata. Currently the upper-levels will not delegate row-specific
     // columns to this method, but there should still be a check here I think.
     if (!result.isValid()) {
-        QHash<TrackId, QVector<QVariant> >::const_iterator it =
-                m_trackInfo.find(trackId);
-        if (it != m_trackInfo.end()) {
+        auto it = m_trackInfo.constFind(trackId);
+        if (it != m_trackInfo.constEnd()) {
             const QVector<QVariant>& fields = it.value();
             result = fields.value(column, result);
         }
@@ -505,7 +520,7 @@ void BaseTrackCache::filterAndSort(const QSet<TrackId>& trackIds,
         qDebug() << "Rows returned:" << rows;
     }
 
-    m_trackOrder.resize(0); // keeps alocated memory
+    m_trackOrder.resize(0); // keeps allocated memory
     trackToIndex->clear();
     if (rows > 0) {
         trackToIndex->reserve(rows);
@@ -714,7 +729,7 @@ int BaseTrackCache::compareColumnValues(int sortColumn, Qt::SortOrder sortOrder,
             result = 0;
         }
     } else {
-        result = val1.toString().localeAwareCompare(val2.toString());
+        result = m_collator.compare(val1.toString(), val2.toString());
     }
 
     // If we're in descending order, flip the comparison.

@@ -13,7 +13,7 @@
 #include "control/controlproxy.h"
 #include "widget/wnumberpos.h"
 #include "engine/enginebuffer.h"
-#include "engine/ratecontrol.h"
+#include "engine/controls/ratecontrol.h"
 #include "mixer/playermanager.h"
 #include "mixer/playerinfo.h"
 #include "control/controlobject.h"
@@ -43,11 +43,11 @@ DlgPrefDeck::DlgPrefDeck(QWidget * parent, MixxxMainWindow * mixxx,
     setupUi(this);
 
     m_pNumDecks = new ControlProxy("[Master]", "num_decks", this);
-    m_pNumDecks->connectValueChanged(SLOT(slotNumDecksChanged(double)));
+    m_pNumDecks->connectValueChanged(this, [=](double value){slotNumDecksChanged(value);});
     slotNumDecksChanged(m_pNumDecks->get(), true);
 
     m_pNumSamplers = new ControlProxy("[Master]", "num_samplers", this);
-    m_pNumSamplers->connectValueChanged(SLOT(slotNumSamplersChanged(double)));
+    m_pNumSamplers->connectValueChanged(this, [=](double value){slotNumSamplersChanged(value);});
     slotNumSamplersChanged(m_pNumSamplers->get(), true);
 
     // Set default value in config file and control objects, if not present
@@ -198,13 +198,13 @@ DlgPrefDeck::DlgPrefDeck(QWidget * parent, MixxxMainWindow * mixxx,
             this, SLOT(slotRatePermFineSpinbox(double)));
 
     m_dRateTempCoarse = m_pConfig->getValue(ConfigKey("[Controls]", "RateTempLeft"),
-            kDefaultPermanentRateChangeCoarse);
-    m_dRateTempFine = m_pConfig->getValue(ConfigKey("[Controls]", "RateTempRight"),
-            kDefaultPermanentRateChangeFine);
-    m_dRatePermCoarse = m_pConfig->getValue(ConfigKey("[Controls]", "RatePermLeft"),
             kDefaultTemporaryRateChangeCoarse);
-    m_dRatePermFine = m_pConfig->getValue(ConfigKey("[Controls]", "RatePermRight"),
+    m_dRateTempFine = m_pConfig->getValue(ConfigKey("[Controls]", "RateTempRight"),
             kDefaultTemporaryRateChangeFine);
+    m_dRatePermCoarse = m_pConfig->getValue(ConfigKey("[Controls]", "RatePermLeft"),
+            kDefaultPermanentRateChangeCoarse);
+    m_dRatePermFine = m_pConfig->getValue(ConfigKey("[Controls]", "RatePermRight"),
+            kDefaultPermanentRateChangeFine);
 
     spinBoxTemporaryRateCoarse->setValue(m_dRateTempCoarse);
     spinBoxTemporaryRateFine->setValue(m_dRateTempFine);

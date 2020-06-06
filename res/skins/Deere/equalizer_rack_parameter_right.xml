@@ -28,7 +28,7 @@
           <EffectParameterKnobComposed>
             <Size>40f,34f</Size>
             <Knob>knob.svg</Knob>
-            <BackPath>knob_bg_<Variable name="color"/>.svg</BackPath>
+            <BackPath>knob_bg_purple.svg</BackPath>
             <MinAngle>-135</MinAngle>
             <MaxAngle>135</MaxAngle>
             <KnobCenterYOffset>1.602</KnobCenterYOffset>
@@ -40,7 +40,7 @@
       </WidgetGroup>
 
       <EffectPushButton>
-        <TooltipId><Variable name="button_TooltipId"/></TooltipId>
+        <TooltipId>EqualizerRack_effect_button_parameter</TooltipId>
         <Size>15f,15f</Size>
         <ObjectName>CircleButton</ObjectName>
         <NumberStates>2</NumberStates>
@@ -61,7 +61,7 @@
           <ButtonState>LeftButton</ButtonState>
         </Connection>
         <Connection>
-          <ConfigKey>[Master],show_killswitches</ConfigKey>
+          <ConfigKey>[Skin],show_eq_kill_buttons</ConfigKey>
           <BindProperty>visible</BindProperty>
         </Connection>
       </EffectPushButton>
@@ -70,7 +70,7 @@
         <Size>0me,1min</Size>
         <Children/>
         <Connection>
-          <ConfigKey>[Master],show_killswitches</ConfigKey>
+          <ConfigKey>[Skin],show_eq_kill_buttons</ConfigKey>
           <Transform><Not/></Transform>
           <BindProperty>visible</BindProperty>
         </Connection>

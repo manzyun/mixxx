@@ -11,7 +11,7 @@
 
 namespace mixxx {
 
-class SoundSourceFLAC: public SoundSource {
+class SoundSourceFLAC final : public SoundSource {
   public:
     explicit SoundSourceFLAC(const QUrl& url);
     ~SoundSourceFLAC() override;
@@ -48,8 +48,6 @@ class SoundSourceFLAC: public SoundSource {
     // of subframes (one for each channel)
     SINT m_maxBlocksize; // in time samples (audio samples = time samples * chanCount)
     SINT m_bitsPerSample;
-
-    CSAMPLE m_sampleScaleFactor;
 
     ReadAheadSampleBuffer m_sampleBuffer;
 

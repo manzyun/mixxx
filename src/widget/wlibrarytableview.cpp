@@ -18,10 +18,12 @@ WLibraryTableView::WLibraryTableView(QWidget* parent,
           m_pConfig(pConfig),
           m_vScrollBarPosKey(vScrollBarPosKey) {
 
+    loadVScrollBarPosState();
+
     // Setup properties for table
 
     // Editing starts when clicking on an already selected item.
-    setEditTriggers(QAbstractItemView::SelectedClicked);
+    setEditTriggers(QAbstractItemView::SelectedClicked|QAbstractItemView::EditKeyPressed);
 
     //Enable selection by rows and extended selection (ctrl/shift click)
     setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -56,20 +58,22 @@ void WLibraryTableView::loadVScrollBarPosState() {
     // position across restarts of Mixxx. Now that we have different views for
     // each mode, the views should just maintain their scrollbar position when
     // you switch views. We should discuss this.
-    m_iSavedVScrollBarPos = m_pConfig->getValueString(m_vScrollBarPosKey).toInt();
+    m_noSearchVScrollBarPos = m_pConfig->getValueString(m_vScrollBarPosKey).toInt();
 }
 
-void WLibraryTableView::restoreVScrollBarPos() {
-    //Restore the scrollbar's position (scroll to that spot)
-    //when the search has been cleared
+void WLibraryTableView::restoreNoSearchVScrollBarPos() {
+    // Restore the scrollbar's position (scroll to that spot)
+    // when the search has been cleared
+    //qDebug() << "restoreNoSearchVScrollBarPos()" << m_noSearchVScrollBarPos;
     updateGeometries();
-    verticalScrollBar()->setValue(m_iSavedVScrollBarPos);
+    verticalScrollBar()->setValue(m_noSearchVScrollBarPos);
 }
 
-void WLibraryTableView::saveVScrollBarPos() {
-    //Save the scrollbar's position so we can return here after
-    //a search is cleared.
-    m_iSavedVScrollBarPos = verticalScrollBar()->value();
+void WLibraryTableView::saveNoSearchVScrollBarPos() {
+    // Save the scrollbar's position so we can return here after
+    // a search is cleared.
+    //qDebug() << "saveNoSearchVScrollBarPos()" << m_noSearchVScrollBarPos;
+    m_noSearchVScrollBarPos = verticalScrollBar()->value();
 }
 
 
@@ -134,4 +138,12 @@ void WLibraryTableView::setTrackTableRowHeight(int rowHeight) {
     int fontHeightPx = metrics.height();
     verticalHeader()->setDefaultSectionSize(math_max(
                                                 rowHeight, fontHeightPx));
+}
+
+void WLibraryTableView::setSelectedClick(bool enable) {
+    if (enable) {
+        setEditTriggers(QAbstractItemView::SelectedClicked|QAbstractItemView::EditKeyPressed);
+    } else {
+        setEditTriggers(QAbstractItemView::EditKeyPressed);
+    }
 }

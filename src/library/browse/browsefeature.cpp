@@ -6,7 +6,7 @@
 #include <QDirModel>
 #include <QStringList>
 #include <QFileInfo>
-#include <QDesktopServices>
+#include <QStandardPaths>
 #include <QAction>
 #include <QMenu>
 #include <QPushButton>
@@ -32,7 +32,8 @@ BrowseFeature::BrowseFeature(QObject* parent,
           m_browseModel(this, pTrackCollection, pRecordingManager),
           m_proxyModel(&m_browseModel),
           m_pTrackCollection(pTrackCollection),
-          m_pLastRightClickedItem(NULL) {
+          m_pLastRightClickedItem(NULL),
+          m_icon(":/images/library/ic_library_computer.svg") {
     connect(this, SIGNAL(requestAddDir(QString)),
             parent, SLOT(slotRequestAddDir(QString)));
 
@@ -199,7 +200,7 @@ void BrowseFeature::slotRemoveQuickLink() {
 }
 
 QIcon BrowseFeature::getIcon() {
-    return QIcon(":/images/library/ic_library_computer.png");
+    return m_icon;
 }
 
 TreeItemModel* BrowseFeature::getChildModel() {
@@ -216,7 +217,7 @@ void BrowseFeature::bindWidget(WLibrary* libraryWidget,
 
 void BrowseFeature::activate() {
     emit(switchToView("BROWSEHOME"));
-    emit(restoreSearch(QString()));
+    emit disableSearch();
     emit(enableCoverArtDisplay(false));
 }
 
@@ -286,8 +287,20 @@ void BrowseFeature::onRightClickChild(const QPoint& globalPos, QModelIndex index
 // This is called whenever you double click or use the triangle symbol to expand
 // the subtree. The method will read the subfolders.
 void BrowseFeature::onLazyChildExpandation(const QModelIndex& index) {
+    // The selected item might have been removed just before this function
+    // is invoked!
+    // NOTE(2018-04-21, uklotzde): The following checks prevent a crash
+    // that would otherwise occur after a quick link has been removed.
+    // Especially the check of QVariant::isValid() seems to be essential.
+    // See also: https://bugs.launchpad.net/mixxx/+bug/1510068
+    // After migration to Qt5 the implementation of all LibraryFeatures
+    // should be revisited, because I consider these checks only as a
+    // temporary workaround.
+    if (!index.isValid()) {
+        return;
+    }
     TreeItem *item = static_cast<TreeItem*>(index.internalPointer());
-    if (!item) {
+    if (!(item && item->getData().isValid())) {
         return;
     }
 
@@ -371,9 +384,7 @@ QString BrowseFeature::getRootViewHtml() const {
 
     QString html;
     html.append(QString("<h2>%1</h2>").arg(browseTitle));
-    html.append("<table border=\"0\" cellpadding=\"5\"><tr><td>");
     html.append(QString("<p>%1</p>").arg(browseSummary));
-    html.append("</td></tr></table>");
     return html;
 }
 
@@ -401,14 +412,14 @@ QString BrowseFeature::extractNameFromPath(QString spath) {
 QStringList BrowseFeature::getDefaultQuickLinks() const {
     // Default configuration
     QStringList mixxxMusicDirs = m_pTrackCollection->getDirectoryDAO().getDirs();
-    QDir osMusicDir(QDesktopServices::storageLocation(
-            QDesktopServices::MusicLocation));
-    QDir osDocumentsDir(QDesktopServices::storageLocation(
-            QDesktopServices::DocumentsLocation));
-    QDir osHomeDir(QDesktopServices::storageLocation(
-            QDesktopServices::HomeLocation));
-    QDir osDesktopDir(QDesktopServices::storageLocation(
-            QDesktopServices::DesktopLocation));
+    QDir osMusicDir(QStandardPaths::writableLocation(
+            QStandardPaths::MusicLocation));
+    QDir osDocumentsDir(QStandardPaths::writableLocation(
+            QStandardPaths::DocumentsLocation));
+    QDir osHomeDir(QStandardPaths::writableLocation(
+            QStandardPaths::HomeLocation));
+    QDir osDesktopDir(QStandardPaths::writableLocation(
+            QStandardPaths::DesktopLocation));
     QDir osDownloadsDir(osHomeDir);
     // TODO(XXX) i18n -- no good way to get the download path. We could tr() it
     // but the translator may not realize we want the usual name of the

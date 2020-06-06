@@ -18,7 +18,7 @@
 
         </Children>
         <Connection>
-          <ConfigKey>[Master],show_eqs</ConfigKey>
+          <ConfigKey>[Skin],show_eq_knobs</ConfigKey>
           <BindProperty>visible</BindProperty>
         </Connection>
       </WidgetGroup>
@@ -46,8 +46,12 @@
                 <SetVariable name="state_1_unpressed">icon/ic_headphones_48px.svg</SetVariable>
                 <SetVariable name="left_connection_control"><Variable name="group"/>,pfl</SetVariable>
               </Template>
+
+              <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
             </Children>
           </WidgetGroup>
+
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
 
           <WidgetGroup>
             <GroupName>CondensedVolumeAndMonoMeter</GroupName>
@@ -72,7 +76,7 @@
                 <MinimumSize>40,50</MinimumSize>
                 <MaximumSize>40,-1</MaximumSize>
                 <Slider scalemode="STRETCH">slider-vertical.svg</Slider>
-                <Handle scalemode="STRETCH_ASPECT">handle-vertical-grey.svg</Handle>
+                <Handle scalemode="STRETCH_ASPECT">handle-vertical-orange.svg</Handle>
                 <Horizontal>false</Horizontal>
                 <Connection>
                   <ConfigKey><Variable name="group"/>,volume</ConfigKey>
@@ -81,7 +85,7 @@
               </SliderComposed>
             </Children>
             <Connection>
-              <ConfigKey>[Master],show_faders</ConfigKey>
+              <ConfigKey>[Skin],show_faders</ConfigKey>
               <BindProperty>visible</BindProperty>
             </Connection>
           </WidgetGroup>
@@ -113,28 +117,29 @@
                 </Children>
               </WidgetGroup>
 
-              <Template src="skin:spacer_hx.xml">
-                <SetVariable name="width">9</SetVariable>
-              </Template>
+              <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
 
             </Children>
             <Connection>
-              <ConfigKey>[Master],show_faders</ConfigKey>
+              <ConfigKey>[Skin],show_faders</ConfigKey>
               <Transform><Not/></Transform>
               <BindProperty>visible</BindProperty>
             </Connection>
           </WidgetGroup>
 
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+
           <WidgetGroup>
             <ObjectName>CondensedButtonContainerLeft</ObjectName>
             <SizePolicy>me,min</SizePolicy>
-            <Layout>vertical</Layout>
+            <Layout>horizontal</Layout>
             <Children>
 
               <Template src="skin:crossfader_orientation_button.xml">
                 <SetVariable name="Unit">Deck<Variable name="i"/></SetVariable>
               </Template>
 
+              <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
             </Children>
           </WidgetGroup>
         </Children>

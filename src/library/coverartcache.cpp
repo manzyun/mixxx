@@ -94,6 +94,7 @@ QPixmap CoverArtCache::requestCover(const CoverInfo& requestInfo,
     }
 
     m_runningRequests.insert(requestId);
+    // The watcher will be deleted in coverLoaded()
     QFutureWatcher<FutureResult>* watcher = new QFutureWatcher<FutureResult>(this);
     QFuture<FutureResult> future = QtConcurrent::run(
             this, &CoverArtCache::loadCover, requestInfo, pRequestor,
@@ -109,7 +110,7 @@ void CoverArtCache::requestCover(const Track& track,
     CoverArtCache* pCache = CoverArtCache::instance();
     if (pCache == nullptr) return;
 
-    CoverInfo info = track.getCoverInfo();
+    CoverInfo info = track.getCoverInfoWithLocation();
     pCache->requestCover(info, pRequestor, 0, false, true);
 }
 
@@ -146,9 +147,13 @@ CoverArtCache::FutureResult CoverArtCache::loadCover(
 
 // watcher
 void CoverArtCache::coverLoaded() {
-    QFutureWatcher<FutureResult>* watcher;
-    watcher = reinterpret_cast<QFutureWatcher<FutureResult>*>(sender());
-    FutureResult res = watcher->result();
+    FutureResult res;
+    {
+        QFutureWatcher<FutureResult>* watcher =
+                static_cast<QFutureWatcher<FutureResult>*>(sender());
+        res = watcher->result();
+        watcher->deleteLater();
+    }
 
     if (sDebug) {
         kLogger.debug() << "coverLoaded" << res.cover;
@@ -189,15 +194,23 @@ void CoverArtCache::requestGuessCover(TrackPointer pTrack) {
 
 void CoverArtCache::guessCover(TrackPointer pTrack) {
     if (pTrack) {
-        kLogger.debug() << "Guessing cover art for" << pTrack->getLocation();
+        if (kLogger.debugEnabled()) {
+            kLogger.debug()
+                    << "Guessing cover art for"
+                    << pTrack->getLocation();
+        }
         CoverInfo cover = CoverArtUtils::guessCoverInfo(*pTrack);
         pTrack->setCoverInfo(cover);
     }
 }
 
 void CoverArtCache::guessCovers(QList<TrackPointer> tracks) {
-    kLogger.debug() << "Guessing cover art for"
-             << tracks.size() << "tracks";
+    if (kLogger.debugEnabled()) {
+        kLogger.debug()
+                << "Guessing cover art for"
+                << tracks.size()
+                << "tracks";
+    }
     foreach (TrackPointer pTrack, tracks) {
         guessCover(pTrack);
     }

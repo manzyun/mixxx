@@ -117,6 +117,7 @@ bool decodeFrameHeader(
         mad_header* pMadHeader,
         mad_stream* pMadStream,
         bool skipId3Tag) {
+    DEBUG_ASSERT(pMadStream);
     DEBUG_ASSERT(isStreamValid(*pMadStream));
     if (mad_header_decode(pMadHeader, pMadStream)) {
         // Something went wrong when decoding the frame header...
@@ -227,7 +228,14 @@ SoundSource::OpenResult SoundSourceMp3::tryOpen(
 
     // Decode all the headers and calculate audio properties
 
-    unsigned long sumBitrate = 0;
+    // The average bitrate is calculated by summing up the bitrate
+    // (in bps <= 320_000) for each counted sample frame and dividing
+    // by the number of counted sample frames. The maximum value for
+    // the nominator is 320_000 * number of sample frames which is
+    // sufficient for 2^63-1 / 320_000 bps / 48_000 Hz = almost
+    // 7000 days of audio duration.
+    quint64 sumBitrateFrames = 0; // nominator
+    quint64 cntBitrateFrames = 0; // denominator
 
     mad_header madHeader;
     mad_header_init(&madHeader);
@@ -284,7 +292,12 @@ SoundSource::OpenResult SoundSourceMp3::tryOpen(
         addSeekFrame(m_curFrameIndex, m_madStream.this_frame);
 
         // Accumulate data from the header
-        sumBitrate += madHeader.bitrate;
+        if (Bitrate(madHeader.bitrate).valid()) {
+            // Accumulate the bitrate per decoded sample frame to calculate
+            // a weighted average for the whole file (see below)
+            sumBitrateFrames += static_cast<quint64>(madHeader.bitrate) * static_cast<quint64>(madFrameLength);
+            cntBitrateFrames += madFrameLength;
+        }
 
         // Update current stream position
         m_curFrameIndex += madFrameLength;
@@ -354,9 +367,14 @@ SoundSource::OpenResult SoundSourceMp3::tryOpen(
     initFrameIndexRangeOnce(IndexRange::forward(0, m_curFrameIndex));
 
     // Calculate average values
+    DEBUG_ASSERT(m_seekFrameList.size() > 0); // see above
     m_avgSeekFrameCount = frameLength() / m_seekFrameList.size();
-    const unsigned long avgBitrate = sumBitrate / m_seekFrameList.size();
-    initBitrateOnce(avgBitrate / 1000);
+    if (cntBitrateFrames > 0) {
+        const unsigned long avgBitrate = sumBitrateFrames / cntBitrateFrames;
+        initBitrateOnce(avgBitrate / 1000); // bps -> kbps
+    } else {
+        kLogger.warning() << "Bitrate cannot be calculated from headers";
+    }
 
     // Terminate m_seekFrameList
     addSeekFrame(m_curFrameIndex, 0);
@@ -393,7 +411,9 @@ void SoundSourceMp3::close() {
 
 void SoundSourceMp3::restartDecoding(
         const SeekFrameType& seekFrame) {
-    kLogger.debug() << "restartDecoding @" << seekFrame.frameIndex;
+    if (kLogger.debugEnabled()) {
+        kLogger.debug() << "restartDecoding @" << seekFrame.frameIndex;
+    }
 
     // Discard decoded output
     m_madSynthCount = 0;
@@ -546,6 +566,8 @@ ReadableSampleFrames SoundSourceMp3::readSampleFramesClamped(
     CSAMPLE* pSampleBuffer = writableSampleFrames.writableData();
     SINT numberOfFramesRemaining = numberOfFramesTotal;
     while (0 < numberOfFramesRemaining) {
+        bool abortReading = false;
+
         if (0 >= m_madSynthCount) {
             // When all decoded output data has been consumed...
             DEBUG_ASSERT(0 == m_madSynthCount);
@@ -609,10 +631,13 @@ ReadableSampleFrames SoundSourceMp3::readSampleFramesClamped(
                             // Don't bother the user with warnings from recoverable
                             // errors while skipping decoded samples or that even
                             // might occur for files that are perfectly ok.
-                            kLogger.debug() << "Recoverable MP3 frame decoding error:"
-                                    << mad_stream_errorstr(&m_madStream);
+                            if (kLogger.debugEnabled()) {
+                                kLogger.debug()
+                                        << "Recoverable MP3 frame decoding error:"
+                                        << mad_stream_errorstr(&m_madStream);
+                            }
                         } else {
-                            kLogger.warning() << "Recoverable MP3 frame decoding error:"
+                            kLogger.info() << "Recoverable MP3 frame decoding error:"
                                     << mad_stream_errorstr(&m_madStream);
                         }
                     }
@@ -620,7 +645,9 @@ ReadableSampleFrames SoundSourceMp3::readSampleFramesClamped(
                 }
             }
             if (pMadThisFrame == m_madStream.this_frame) {
-                kLogger.debug() << "Retry decoding MP3 frame @" << m_curFrameIndex;
+                if (kLogger.debugEnabled()) {
+                    kLogger.debug() << "Retry decoding MP3 frame @" << m_curFrameIndex;
+                }
                 // Retry decoding
                 continue;
             }
@@ -630,8 +657,10 @@ ReadableSampleFrames SoundSourceMp3::readSampleFramesClamped(
 #ifndef QT_NO_DEBUG_OUTPUT
             const SINT madFrameChannelCount = MAD_NCHANNELS(&m_madFrame.header);
             if (madFrameChannelCount != channelCount()) {
-                kLogger.debug() << "MP3 frame header with mismatching number of channels"
-                        << madFrameChannelCount << "<>" << channelCount();
+                kLogger.warning() << "MP3 frame header with mismatching number of channels"
+                        << madFrameChannelCount << "<>" << channelCount()
+                        << " - aborting";
+                abortReading = true;
             }
 #endif
 
@@ -640,12 +669,20 @@ ReadableSampleFrames SoundSourceMp3::readSampleFramesClamped(
 #ifndef QT_NO_DEBUG_OUTPUT
             const SINT madSynthSampleRate =  m_madSynth.pcm.samplerate;
             if (madSynthSampleRate != sampleRate()) {
-                kLogger.debug() << "Reading MP3 data with different sample rate"
-                        << madSynthSampleRate << "<>" << sampleRate();
+                kLogger.warning() << "Reading MP3 data with different sample rate"
+                        << madSynthSampleRate << "<>" << sampleRate()
+                        << " - aborting";
+                abortReading = true;
             }
 #endif
             m_madSynthCount = m_madSynth.pcm.length;
             DEBUG_ASSERT(0 < m_madSynthCount);
+        }
+
+        if (abortReading) {
+            // Refuse to continue for preventing crashes while
+            // decoding/reading corrupt files
+            break;
         }
 
         const SINT synthReadCount = math_min(

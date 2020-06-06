@@ -3,6 +3,7 @@
 #include <QUrl>
 #include <QMimeData>
 #include <QStylePainter>
+#include <QWindow>
 
 #include "control/controlobject.h"
 #include "control/controlproxy.h"
@@ -11,6 +12,7 @@
 #include "waveform/sharedglcontext.h"
 #include "util/math.h"
 #include "waveform/visualplayposition.h"
+#include "waveform/vsyncthread.h"
 #include "vinylcontrol/vinylcontrol.h"
 #include "vinylcontrol/vinylcontrolmanager.h"
 #include "widget/wspinny.h"
@@ -21,14 +23,10 @@ WSpinny::WSpinny(QWidget* parent, const QString& group,
                  UserSettingsPointer pConfig,
                  VinylControlManager* pVCMan,
                  BaseTrackPlayer* pPlayer)
-        : QGLWidget(QGLFormat(QGL::SampleBuffers), parent, SharedGLContext::getWidget()),
+        : QGLWidget(parent, SharedGLContext::getWidget()),
           WBaseWidget(this),
           m_group(group),
           m_pConfig(pConfig),
-          m_pBgImage(nullptr),
-          m_pMaskImage(nullptr),
-          m_pFgImage(nullptr),
-          m_pGhostImage(nullptr),
           m_pPlay(nullptr),
           m_pPlayPos(nullptr),
           m_pVisualPlayPos(nullptr),
@@ -60,7 +58,6 @@ WSpinny::WSpinny(QWidget* parent, const QString& group,
           m_dRotationsPerSecond(0.),
           m_bClampFailedWarning(false),
           m_bGhostPlayback(false),
-          m_bWidgetDirty(false),
           m_pPlayer(pPlayer),
           m_pDlgCoverArt(new DlgCoverArtFullSize(parent, pPlayer)),
           m_pCoverMenu(new WCoverArtMenu(this)) {
@@ -76,9 +73,9 @@ WSpinny::WSpinny(QWidget* parent, const QString& group,
     CoverArtCache* pCache = CoverArtCache::instance();
     if (pCache != nullptr) {
         connect(pCache, SIGNAL(coverFound(const QObject*,
-                                          const CoverInfo&, QPixmap, bool)),
+                                          const CoverInfoRelative&, QPixmap, bool)),
                 this, SLOT(slotCoverFound(const QObject*,
-                                          const CoverInfo&, QPixmap, bool)));
+                                          const CoverInfoRelative&, QPixmap, bool)));
     }
 
     if (m_pPlayer != nullptr) {
@@ -90,20 +87,22 @@ WSpinny::WSpinny(QWidget* parent, const QString& group,
         slotLoadTrack(m_pPlayer->getLoadedTrack());
     }
 
-    connect(m_pCoverMenu, SIGNAL(coverInfoSelected(const CoverInfo&)),
-        this, SLOT(slotCoverInfoSelected(const CoverInfo&)));
+    connect(m_pCoverMenu, SIGNAL(coverInfoSelected(const CoverInfoRelative&)),
+        this, SLOT(slotCoverInfoSelected(const CoverInfoRelative&)));
     connect(m_pCoverMenu, SIGNAL(reloadCoverArt()),
         this, SLOT(slotReloadCoverArt()));
+
+    setAttribute(Qt::WA_NoSystemBackground);
+    setAttribute(Qt::WA_OpaquePaintEvent);
+
+    setAutoFillBackground(false);
+    setAutoBufferSwap(false);
 }
 
 WSpinny::~WSpinny() {
 #ifdef __VINYLCONTROL__
     m_pVCManager->removeSignalQualityListener(this);
 #endif
-    WImageStore::deleteImage(m_pBgImage);
-    WImageStore::deleteImage(m_pMaskImage);
-    WImageStore::deleteImage(m_pFgImage);
-    WImageStore::deleteImage(m_pGhostImage);
 }
 
 void WSpinny::onVinylSignalQualityUpdate(const VinylSignalQualityReport& report) {
@@ -137,7 +136,6 @@ void WSpinny::onVinylSignalQualityUpdate(const VinylSignalQualityReport& report)
             line++;
         }
     }
-    m_bWidgetDirty = true;
 #endif
 }
 
@@ -201,8 +199,7 @@ void WSpinny::setup(const QDomNode& node, const SkinContext& context) {
 
     m_pSlipEnabled = new ControlProxy(
             m_group, "slip_enabled", this);
-    m_pSlipEnabled->connectValueChanged(
-            SLOT(updateSlipEnabled(double)));
+    m_pSlipEnabled->connectValueChanged(this, &WSpinny::updateSlipEnabled);
 
 #ifdef __VINYLCONTROL__
     m_pVinylControlSpeedType = new ControlProxy(
@@ -212,37 +209,24 @@ void WSpinny::setup(const QDomNode& node, const SkinContext& context) {
 
     m_pVinylControlEnabled = new ControlProxy(
             m_group, "vinylcontrol_enabled", this);
-    m_pVinylControlEnabled->connectValueChanged(
-            SLOT(updateVinylControlEnabled(double)));
+    m_pVinylControlEnabled->connectValueChanged(this,
+            &WSpinny::updateVinylControlEnabled);
 
     m_pSignalEnabled = new ControlProxy(
             m_group, "vinylcontrol_signal_enabled", this);
-    m_pSignalEnabled->connectValueChanged(
-            SLOT(updateVinylControlSignalEnabled(double)));
+    m_pSignalEnabled->connectValueChanged(this,
+            &WSpinny::updateVinylControlSignalEnabled);
 
     // Match the vinyl control's set RPM so that the spinny widget rotates at
     // the same speed as your physical decks, if you're using vinyl control.
-    m_pVinylControlSpeedType->connectValueChanged(
-            SLOT(updateVinylControlSpeed(double)));
+    m_pVinylControlSpeedType->connectValueChanged(this,
+            &WSpinny::updateVinylControlSpeed);
 
 
 #else
     //if no vinyl control, just call it 33
     this->updateVinylControlSpeed(33.0);
 #endif
-}
-
-void WSpinny::maybeUpdate() {
-    if (!m_pVisualPlayPos.isNull()) {
-        m_pVisualPlayPos->getPlaySlipAt(0,
-                                        &m_dAngleCurrentPlaypos,
-                                        &m_dGhostAngleCurrentPlaypos);
-    }
-    if (m_dAngleCurrentPlaypos != m_dAngleLastPlaypos ||
-            m_dGhostAngleCurrentPlaypos != m_dGhostAngleLastPlaypos ||
-            m_bWidgetDirty) {
-        repaint();
-    }
 }
 
 void WSpinny::slotLoadTrack(TrackPointer pTrack) {
@@ -282,7 +266,7 @@ void WSpinny::slotTrackCoverArtUpdated() {
 }
 
 void WSpinny::slotCoverFound(const QObject* pRequestor,
-                             const CoverInfo& info, QPixmap pixmap,
+                             const CoverInfoRelative& info, QPixmap pixmap,
                              bool fromCache) {
     Q_UNUSED(info);
     Q_UNUSED(fromCache);
@@ -297,7 +281,7 @@ void WSpinny::slotCoverFound(const QObject* pRequestor,
     }
 }
 
-void WSpinny::slotCoverInfoSelected(const CoverInfo& coverInfo) {
+void WSpinny::slotCoverInfoSelected(const CoverInfoRelative& coverInfo) {
     if (m_loadedTrack != nullptr) {
         // Will trigger slotTrackCoverArtUpdated().
         m_loadedTrack->setCoverInfo(coverInfo);
@@ -314,8 +298,24 @@ void WSpinny::slotReloadCoverArt() {
 }
 
 void WSpinny::paintEvent(QPaintEvent *e) {
-    Q_UNUSED(e); //ditch unused param warning
-    m_bWidgetDirty = false;
+    Q_UNUSED(e);
+}
+
+void WSpinny::render() {
+    if (!isValid() || !isVisible()) {
+        return;
+    }
+
+    auto window = windowHandle();
+    if (window == nullptr || !window->isExposed()) {
+        return;
+    }
+
+    if (!m_pVisualPlayPos.isNull()) {
+        m_pVisualPlayPos->getPlaySlipAt(0,
+                                        &m_dAngleCurrentPlaypos,
+                                        &m_dGhostAngleCurrentPlaypos);
+    }
 
     QStyleOption option;
     option.initFrom(this);
@@ -383,11 +383,23 @@ void WSpinny::paintEvent(QPaintEvent *e) {
         p.drawImage(-(m_ghostImageScaled.width() / 2),
                     -(m_ghostImageScaled.height() / 2), m_ghostImageScaled);
 
-        //Rotate back to the playback position (not the ghost positon),
+        //Rotate back to the playback position (not the ghost position),
         //and draw the beat marks from there.
         p.restore();
     }
 }
+
+void WSpinny::swap() {
+    if (!isValid() || !isVisible()) {
+        return;
+    }
+    auto window = windowHandle();
+    if (window == nullptr || !window->isExposed()) {
+        return;
+    }
+    VSyncThread::swapGl(this, 0);
+}
+
 
 QPixmap WSpinny::scaledCoverArt(const QPixmap& normal) {
     if (normal.isNull()) {
@@ -516,18 +528,15 @@ void WSpinny::updateVinylControlSignalEnabled(double enabled) {
         // fill with transparent black
         m_qImage.fill(qRgba(0,0,0,0));
     }
-    m_bWidgetDirty = true;
 #endif
 }
 
 void WSpinny::updateVinylControlEnabled(double enabled) {
     m_bVinylActive = enabled;
-    m_bWidgetDirty = true;
 }
 
 void WSpinny::updateSlipEnabled(double enabled) {
     m_bGhostPlayback = static_cast<bool>(enabled);
-    m_bWidgetDirty = true;
 }
 
 void WSpinny::mouseMoveEvent(QMouseEvent * e) {

@@ -48,6 +48,10 @@ class AutoDJFeature : public LibraryFeature {
 
     TreeItemModel* getChildModel();
 
+    bool hasTrackTable() override {
+        return true;
+    }
+
   public slots:
     void activate();
 
@@ -86,6 +90,8 @@ class AutoDJFeature : public LibraryFeature {
 
     // Used to map menu-item signals.
     QSignalMapper m_crateMapper;
+
+    QIcon m_icon;
 
   private slots:
     // Add a crate to the auto-DJ queue.

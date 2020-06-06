@@ -49,7 +49,7 @@ QString computeResourcePath() {
 #endif
 #ifdef __APPLE__
         else if (mixxxDir.cdUp() && mixxxDir.cd("Resources")) {
-            // Release configuraton
+            // Release configuration
             qResourcePath = mixxxDir.absolutePath();
         } else {
             // TODO(rryan): What should we do here?
@@ -73,8 +73,11 @@ QString computeResourcePath() {
 }
 
 QString computeSettingsPath(const QString& configFilename) {
-    QFileInfo configFileInfo(configFilename);
-    return configFileInfo.absoluteDir().absolutePath();
+    if (!configFilename.isEmpty()) {
+        QFileInfo configFileInfo(configFilename);
+        return configFileInfo.absoluteDir().absolutePath();
+    }
+    return QString();
 }
 
 }  // namespace
@@ -108,6 +111,10 @@ ConfigValue::ConfigValue(const QString& stValue)
 
 ConfigValue::ConfigValue(int iValue)
     : value(QString::number(iValue)) {
+}
+
+ConfigValue::ConfigValue(double dValue)
+    : value(QString::number(dValue)) {
 }
 
 void ConfigValue::valCopy(const ConfigValue& configValue) {
@@ -242,8 +249,7 @@ template <class ValueType> void ConfigObject<ValueType>::save() {
 
         QString grp = "";
 
-        typename QMap<ConfigKey, ValueType>::const_iterator i;
-        for (i = m_values.begin(); i != m_values.end(); ++i) {
+        for (auto i = m_values.constBegin(); i != m_values.constEnd(); ++i) {
             //qDebug() << "group:" << it.key().group << "item" << it.key().item << "val" << it.value()->value;
             if (i.key().group != grp) {
                 grp = i.key().group;
@@ -263,7 +269,7 @@ template <class ValueType> ConfigObject<ValueType>::ConfigObject(const QDomNode&
         QDomNode ctrl = node.firstChild();
 
         while (!ctrl.isNull()) {
-            if(ctrl.nodeName() == "control") {
+            if (ctrl.nodeName() == "control") {
                 QString group = XmlParse::selectNodeQString(ctrl, "group");
                 QString key = XmlParse::selectNodeQString(ctrl, "key");
                 ConfigKey k(group, key);
@@ -280,8 +286,7 @@ QMultiHash<ValueType, ConfigKey> ConfigObject<ValueType>::transpose() const {
     QReadLocker lock(&m_valuesLock);
 
     QMultiHash<ValueType, ConfigKey> transposedHash;
-    for (typename QMap<ConfigKey, ValueType>::const_iterator it =
-            m_values.begin(); it != m_values.end(); ++it) {
+    for (auto it = m_values.constBegin(); it != m_values.constEnd(); ++it) {
         transposedHash.insert(it.value(), it.key());
     }
     return transposedHash;

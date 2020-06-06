@@ -6,6 +6,7 @@
 #include <QtDebug>
 
 #include "util/math.h"
+#include "util/memory.h"
 #include "skin/imgloader.h"
 
 // static
@@ -50,12 +51,22 @@ Paintable::Paintable(const PixmapSource& source, DrawMode mode, double scaleFact
     if (!source.isSVG()) {
         m_pPixmap.reset(WPixmapStore::getPixmapNoCache(source.getPath(), scaleFactor));
     } else {
-        m_pSvg.reset(new QSvgRenderer());
-        if (source.getData().isEmpty()) {
-            m_pSvg->load(source.getPath());
+        auto pSvg = std::make_unique<QSvgRenderer>();
+        if (!source.getSvgSourceData().isEmpty()) {
+            // Call here the different overload for svg content
+            if (!pSvg->load(source.getSvgSourceData())) {
+                // The above line already logs a warning
+                return;
+            }
+        } else if (!source.getPath().isEmpty()) {
+            if (!pSvg->load(source.getPath())) {
+                // The above line already logs a warning
+                return;
+            }
         } else {
-            m_pSvg->load(source.getData());
+            return;
         }
+        m_pSvg.reset(pSvg.release());
 #ifdef __APPLE__
         // Apple does Retina scaling behind the sceens, so we also pass a
         // Paintable::FIXED image. On the other targets, it is better to
@@ -252,7 +263,7 @@ QString Paintable::getAltFileName(const QString& fileName) {
         return fileName;
     }
 
-    QString newFileName = temp[0] + QString::fromAscii("@2x.") + temp[1];
+    QString newFileName = temp[0] + QLatin1String("@2x.") + temp[1];
     QFile file(newFileName);
     if (QFileInfo(file).exists()) {
         return newFileName;

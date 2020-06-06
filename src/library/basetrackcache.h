@@ -18,6 +18,7 @@
 #include "track/track.h"
 #include "util/class.h"
 #include "util/memory.h"
+#include "util/string.h"
 
 class SearchQueryParser;
 class QueryNode;
@@ -87,8 +88,7 @@ class BaseTrackCache : public QObject {
     void slotDbTrackAdded(TrackPointer pTrack);
 
   private:
-    TrackPointer getRecentTrack(TrackId trackId) const;
-    void refreshRecentTrack(TrackId trackId) const;
+    const TrackPointer& getRecentTrack(TrackId trackId) const;
     void replaceRecentTrack(TrackPointer pTrack) const;
     void replaceRecentTrack(TrackId trackId, TrackPointer pTrack) const;
     void resetRecentTrack() const;
@@ -96,7 +96,7 @@ class BaseTrackCache : public QObject {
     bool updateIndexWithQuery(const QString& query);
     bool updateIndexWithTrackpointer(TrackPointer pTrack);
     void updateTrackInIndex(TrackId trackId);
-    void updateTracksInIndex(QSet<TrackId> trackIds);
+    void updateTracksInIndex(const QSet<TrackId>& trackIds);
     void getTrackValueForColumn(TrackPointer pTrack, int column,
                                 QVariant& trackValue) const;
 
@@ -122,6 +122,8 @@ class BaseTrackCache : public QObject {
     const QString m_columnsJoined;
 
     const ColumnCache m_columnCache;
+
+    const StringCollator m_collator;
 
     QStringList m_searchColumns;
     QVector<int> m_searchColumnIndices;

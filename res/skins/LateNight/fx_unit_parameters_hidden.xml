@@ -4,13 +4,12 @@
     An effect unit widget.
   Variables:
     group: The group for the controls.
+    FxRack
+    FxUnit
 -->
 <Template>
   <SetVariable name="FxRack_FxUnit">EffectRack<Variable name="FxRack"/>_EffectUnit<Variable name="FxUnit"/></SetVariable>
-      
-<!-- Singletons -->
 
-<!-- Structure -->
   <WidgetGroup>
     <ObjectName>EffectUnit<Variable name="FxUnit"/></ObjectName>
     <Layout>horizontal</Layout>
@@ -21,7 +20,7 @@
         <ObjectName>EffectRows</ObjectName>
         <SizePolicy>me,min</SizePolicy>
         <Layout>horizontal</Layout>
-        <BackPath>background_tile.png</BackPath>
+        <BackPath>style/background_tile.png</BackPath>
         <Children>
 
           <WidgetGroup><Size>0min,1me</Size></WidgetGroup>
@@ -29,7 +28,7 @@
           <WidgetGroup>
             <Layout>horizontal</Layout>
             <SizePolicy>me,min</SizePolicy>
-            <MaximumSize>250,-1</MaximumSize>
+            <MaximumSize>220,-1</MaximumSize>
             <Children>
               <Template src="skin:fx_slot.xml">
                 <SetVariable name="FxNum">1</SetVariable>
@@ -42,7 +41,7 @@
           <WidgetGroup>
             <Layout>horizontal</Layout>
             <SizePolicy>me,min</SizePolicy>
-            <MaximumSize>250,-1</MaximumSize>
+            <MaximumSize>220,-1</MaximumSize>
             <Children>
               <Template src="skin:fx_slot.xml">
                 <SetVariable name="FxNum">2</SetVariable>
@@ -55,7 +54,7 @@
           <WidgetGroup>
             <Layout>horizontal</Layout>
             <SizePolicy>me,min</SizePolicy>
-            <MaximumSize>250,-1</MaximumSize>
+            <MaximumSize>220,-1</MaximumSize>
             <Children>
               <Template src="skin:fx_slot.xml">
                 <SetVariable name="FxNum">3</SetVariable>
@@ -68,7 +67,7 @@
       <WidgetGroup><!-- Mix / Super -->
         <ObjectName>EffectUnitControls</ObjectName>
         <Layout>horizontal</Layout>
-        <SizePolicy>max,max</SizePolicy>
+        <SizePolicy>max,min</SizePolicy>
         <Children>
 
           <WidgetGroup><Size>5f,</Size></WidgetGroup>
@@ -84,7 +83,7 @@
               <WidgetGroup><Size>5f,</Size></WidgetGroup>
             </Children>
             <Connection>
-              <ConfigKey persist="true">[Master],show_superknobs</ConfigKey>
+              <ConfigKey persist="true">[Skin],show_superknobs</ConfigKey>
               <BindProperty>visible</BindProperty>
             </Connection>
           </WidgetGroup>
@@ -95,6 +94,19 @@
 
           <WidgetGroup><Size>3f,</Size></WidgetGroup>
 
+          <WidgetGroup><!-- Super knob, optional -->
+            <Layout>vertical</Layout>
+            <SizePolicy>max,me</SizePolicy>
+            <Children>
+              <WidgetGroup><Size>1min,7f</Size></WidgetGroup>
+
+				      <SingletonContainer>
+				        <ObjectName>FxUnit<Variable name="FxUnit"/>_PflButton</ObjectName>
+				      </SingletonContainer>
+              <WidgetGroup><Size>1min,1me</Size></WidgetGroup>
+            </Children>
+          </WidgetGroup>
+
           <WidgetGroup><!-- No parameters -->
             <SizePolicy>me,max</SizePolicy>
             <Layout>vertical</Layout>
@@ -104,7 +116,7 @@
               </SingletonContainer>
 
               <SingletonContainer>
-                <ObjectName>FxUnit<Variable name="FxUnit"/>_PflButton</ObjectName>
+                <ObjectName>FxUnit<Variable name="FxUnit"/>_MixModeButton</ObjectName>
               </SingletonContainer>
             </Children>
           </WidgetGroup>

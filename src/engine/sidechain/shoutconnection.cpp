@@ -22,22 +22,28 @@
 #include "control/controlpushbutton.h"
 #include "encoder/encoder.h"
 #include "encoder/encoderbroadcastsettings.h"
+#ifdef __OPUS__
+#include "encoder/encoderopus.h"
+#endif
 #include "mixer/playerinfo.h"
 #include "preferences/usersettings.h"
 #include "recording/defs_recording.h"
 #include "track/track.h"
+#include "util/compatibility.h"
 #include "util/logger.h"
 
 #include <engine/sidechain/shoutconnection.h>
 
 namespace {
-static const int kConnectRetries = 30;
-static const int kMaxNetworkCache = 491520;  // 10 s mp3 @ 192 kbit/s
+
+const int kConnectRetries = 30;
+const int kMaxNetworkCache = 491520;  // 10 s mp3 @ 192 kbit/s
 // Shoutcast default receive buffer 1048576 and autodumpsourcetime 30 s
 // http://wiki.shoutcast.com/wiki/SHOUTcast_DNAS_Server_2
-static const int kMaxShoutFailures = 3;
+const int kMaxShoutFailures = 3;
 
 const mixxx::Logger kLogger("ShoutConnection");
+
 }
 
 ShoutConnection::ShoutConnection(BroadcastProfilePtr profile,
@@ -52,12 +58,13 @@ ShoutConnection::ShoutConnection(BroadcastProfilePtr profile,
           m_pConfig(pConfig),
           m_pProfile(profile),
           m_encoder(nullptr),
-          m_pMasterSamplerate(new ControlProxy("[Master]", "samplerate")),
-          m_pBroadcastEnabled(new ControlProxy(BROADCAST_PREF_KEY, "enabled")),
+          m_pMasterSamplerate(new ControlProxy("[Master]", "samplerate", this)),
+          m_pBroadcastEnabled(new ControlProxy(BROADCAST_PREF_KEY, "enabled", this)),
           m_custom_metadata(false),
           m_firstCall(false),
           m_format_is_mp3(false),
           m_format_is_ov(false),
+          m_format_is_opus(false),
           m_protocol_is_icecast1(false),
           m_protocol_is_icecast2(false),
           m_protocol_is_shoutcast(false),
@@ -229,6 +236,9 @@ void ShoutConnection::updateFromPreferences() {
     QByteArray baStreamWebsite = encodeString(m_pProfile->getStreamWebsite());
     QByteArray baStreamDesc = encodeString(m_pProfile->getStreamDesc());
     QByteArray baStreamGenre = encodeString(m_pProfile->getStreamGenre());
+    QByteArray baStreamIRC = encodeString(m_pProfile->getStreamIRC());
+    QByteArray baStreamAIM = encodeString(m_pProfile->getStreamAIM());
+    QByteArray baStreamICQ = encodeString(m_pProfile->getStreamICQ());
 
     // Whether the stream is public.
     bool streamPublic = m_pProfile->getStreamPublic();
@@ -308,6 +318,27 @@ void ShoutConnection::updateFromPreferences() {
         return;
     }
 
+#ifdef SHOUT_META_IRC
+    if (shout_set_meta(m_pShout, SHOUT_META_IRC, baStreamIRC.constData()) != SHOUTERR_SUCCESS) {
+        errorDialog(tr("Error setting stream IRC!"), shout_get_error(m_pShout));
+        return;
+    }
+#endif
+
+#ifdef SHOUT_META_AIM
+    if (shout_set_meta(m_pShout, SHOUT_META_AIM, baStreamAIM.constData()) != SHOUTERR_SUCCESS) {
+        errorDialog(tr("Error setting stream AIM!"), shout_get_error(m_pShout));
+        return;
+    }
+#endif
+
+#ifdef SHOUT_META_ICQ
+    if (shout_set_meta(m_pShout, SHOUT_META_ICQ, baStreamICQ.constData()) != SHOUTERR_SUCCESS) {
+        errorDialog(tr("Error setting stream ICQ!"), shout_get_error(m_pShout));
+        return;
+    }
+#endif
+
     if (shout_set_public(m_pShout, streamPublic ? 1 : 0) != SHOUTERR_SUCCESS) {
         errorDialog(tr("Error setting stream public!"), shout_get_error(m_pShout));
         return;
@@ -315,9 +346,10 @@ void ShoutConnection::updateFromPreferences() {
 
     m_format_is_mp3 = !qstrcmp(baFormat.constData(), BROADCAST_FORMAT_MP3);
     m_format_is_ov = !qstrcmp(baFormat.constData(), BROADCAST_FORMAT_OV);
+    m_format_is_opus = !qstrcmp(baFormat.constData(), BROADCAST_FORMAT_OPUS);
     if (m_format_is_mp3) {
         format = SHOUT_FORMAT_MP3;
-    } else if (m_format_is_ov) {
+    } else if (m_format_is_ov || m_format_is_opus) {
         format = SHOUT_FORMAT_OGG;
     } else {
         qWarning() << "Error: unknown format:" << baFormat.constData();
@@ -335,13 +367,23 @@ void ShoutConnection::updateFromPreferences() {
 
     int iMasterSamplerate = m_pMasterSamplerate->get();
     if (m_format_is_ov && iMasterSamplerate == 96000) {
-        errorDialog(tr("Broadcasting at 96kHz with Ogg Vorbis is not currently "
+        errorDialog(tr("Broadcasting at 96 kHz with Ogg Vorbis is not currently "
                        "supported. Please try a different sample-rate or switch "
                        "to a different encoding."),
                     tr("See https://bugs.launchpad.net/mixxx/+bug/686212 for more "
                        "information."));
         return;
     }
+
+#ifdef __OPUS__
+    if(m_format_is_opus && iMasterSamplerate != EncoderOpus::getMasterSamplerate()) {
+        errorDialog(
+            EncoderOpus::getInvalidSamplerateMessage(),
+            tr("Unsupported samplerate")
+        );
+        return;
+    }
+#endif
 
     if (shout_set_audio_info(
             m_pShout, SHOUT_AI_BITRATE,
@@ -386,7 +428,14 @@ void ShoutConnection::updateFromPreferences() {
         m_encoder = EncoderFactory::getFactory().getNewEncoder(
             EncoderFactory::getFactory().getFormatFor(ENCODING_OGG), m_pConfig, this);
         m_encoder->setEncoderSettings(broadcastSettings);
-    } else {
+    }
+#ifdef __OPUS__
+    else if (m_format_is_opus) {
+        m_encoder = EncoderFactory::getFactory().getNewEncoder(
+            EncoderFactory::getFactory().getFormatFor(ENCODING_OPUS), m_pConfig, this);
+    }
+#endif
+    else {
         kLogger.warning() << "**** Unknown Encoder Format";
         setState(NETWORKSTREAMWORKER_STATE_ERROR);
         m_lastErrorStr = "Encoder format error";
@@ -899,7 +948,7 @@ QSharedPointer<FIFO<CSAMPLE>> ShoutConnection::getOutputFifo() {
 }
 
 bool ShoutConnection::threadWaiting() {
-    return m_threadWaiting;
+    return m_threadWaiting.load();
 }
 
 void ShoutConnection::run() {
@@ -996,4 +1045,3 @@ void ShoutConnection::ignoreSigpipe() {
 #endif
 }
 #endif
-

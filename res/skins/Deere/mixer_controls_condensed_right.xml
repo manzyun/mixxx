@@ -18,7 +18,7 @@
 
         </Children>
         <Connection>
-          <ConfigKey>[Master],show_eqs</ConfigKey>
+          <ConfigKey>[Skin],show_eq_knobs</ConfigKey>
           <BindProperty>visible</BindProperty>
         </Connection>
       </WidgetGroup>
@@ -32,6 +32,8 @@
             <SizePolicy>min,min</SizePolicy>
             <Layout>horizontal</Layout>
             <Children>
+              <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
+
               <Template src="skin:left_2state_button.xml">
                 <SetVariable name="TooltipId">pfl</SetVariable>
                 <SetVariable name="ObjectName">DeckPFLButton</SetVariable>
@@ -49,6 +51,8 @@
             </Children>
           </WidgetGroup><!-- PFL -->
 
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+
           <WidgetGroup><!-- VU + Vol fader -->
             <GroupName>CondensedVolumeAndMonoMeter</GroupName>
             <Layout>horizontal</Layout>
@@ -61,7 +65,7 @@
                 <MinimumSize>40,50</MinimumSize>
                 <MaximumSize>40,-1</MaximumSize>
                 <Slider scalemode="STRETCH">slider-vertical.svg</Slider>
-                <Handle scalemode="STRETCH_ASPECT">handle-vertical-grey.svg</Handle>
+                <Handle scalemode="STRETCH_ASPECT">handle-vertical-orange.svg</Handle>
                 <Horizontal>false</Horizontal>
                 <Connection>
                   <ConfigKey><Variable name="group"/>,volume</ConfigKey>
@@ -83,7 +87,7 @@
 
             </Children>
             <Connection>
-              <ConfigKey>[Master],show_faders</ConfigKey>
+              <ConfigKey>[Skin],show_faders</ConfigKey>
               <BindProperty>visible</BindProperty>
             </Connection>
           </WidgetGroup><!-- VU + Vol fader -->
@@ -93,9 +97,7 @@
             <SizePolicy>me,min</SizePolicy>
             <Children>
 
-              <Template src="skin:spacer_hx.xml">
-                <SetVariable name="width">9</SetVariable>
-              </Template>
+              <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
 
               <WidgetGroup>
                 <ObjectName>channel_VuMeter_Group</ObjectName>
@@ -121,17 +123,20 @@
 
             </Children>
             <Connection>
-              <ConfigKey>[Master],show_faders</ConfigKey>
+              <ConfigKey>[Skin],show_faders</ConfigKey>
               <BindProperty>visible</BindProperty>
               <Transform><Not/></Transform>
             </Connection>
           </WidgetGroup><!-- VU + spacer -->
 
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+
           <WidgetGroup>
             <ObjectName>CondensedButtonContainerRight</ObjectName>
             <SizePolicy>me,min</SizePolicy>
-            <Layout>vertical</Layout>
+            <Layout>horizontal</Layout>
             <Children>
+              <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
 
               <Template src="skin:crossfader_orientation_button.xml">
                 <SetVariable name="Unit">Deck<Variable name="i"/></SetVariable>

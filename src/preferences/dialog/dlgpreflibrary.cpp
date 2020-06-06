@@ -1,4 +1,5 @@
 #include <QDesktopServices>
+#include <QStandardPaths>
 #include <QDir>
 #include <QFileDialog>
 #include <QStringList>
@@ -11,8 +12,11 @@
 #include "preferences/dialog/dlgpreflibrary.h"
 #include "library/dlgtrackmetadataexport.h"
 #include "sources/soundsourceproxy.h"
+#include "widget/wsearchlineedit.h"
 
-#define MIXXX_ADDONS_URL "http://www.mixxx.org/wiki/doku.php/add-ons"
+namespace {
+    const ConfigKey kSearchDebouncingTimeoutMillisKey = ConfigKey("[Library]","SearchDebouncingTimeoutMillis");
+}
 
 DlgPrefLibrary::DlgPrefLibrary(
         QWidget* pParent,
@@ -38,16 +42,6 @@ DlgPrefLibrary::DlgPrefLibrary(
             this, SLOT(slotRemoveDir()));
     connect(PushButtonRelocateDir, SIGNAL(clicked()),
             this, SLOT(slotRelocateDir()));
-    //connect(pushButtonM4A, SIGNAL(clicked()), this, SLOT(slotM4ACheck()));
-    connect(pushButtonExtraPlugins, SIGNAL(clicked()),
-            this, SLOT(slotExtraPlugins()));
-
-    // plugins are loaded in src/main.cpp way early in boot so this is safe
-    // here, doesn't need done at every slotUpdate
-    QStringList plugins(SoundSourceProxy::getSupportedFileExtensionsByPlugins());
-    if (plugins.length() > 0) {
-        pluginsLabel->setText(plugins.join(", "));
-    }
 
     // Set default direction as stored in config file
     int rowHeight = m_pLibrary->getTrackTableRowHeight();
@@ -55,23 +49,35 @@ DlgPrefLibrary::DlgPrefLibrary(
     connect(spinBoxRowHeight, SIGNAL(valueChanged(int)),
             this, SLOT(slotRowHeightValueChanged(int)));
 
+    searchDebouncingTimeoutSpinBox->setMinimum(WSearchLineEdit::kMinDebouncingTimeoutMillis);
+    searchDebouncingTimeoutSpinBox->setMaximum(WSearchLineEdit::kMaxDebouncingTimeoutMillis);
+    const auto searchDebouncingTimeoutMillis =
+            m_pConfig->getValue(
+                    ConfigKey("[Library]","SearchDebouncingTimeoutMillis"),
+                    WSearchLineEdit::kDefaultDebouncingTimeoutMillis);
+    searchDebouncingTimeoutSpinBox->setValue(searchDebouncingTimeoutMillis);
+    connect(searchDebouncingTimeoutSpinBox, SIGNAL(valueChanged(int)),
+            this, SLOT(slotSearchDebouncingTimeoutMillisChanged(int)));
+
     connect(libraryFontButton, SIGNAL(clicked()),
             this, SLOT(slotSelectFont()));
-    connect(this, SIGNAL(setTrackTableFont(QFont)),
-            m_pLibrary, SLOT(slotSetTrackTableFont(QFont)));
-    connect(this, SIGNAL(setTrackTableRowHeight(int)),
-            m_pLibrary, SLOT(slotSetTrackTableRowHeight(int)));
 
     // TODO(XXX) this string should be extracted from the soundsources
-    QString builtInFormatsStr = "Ogg Vorbis, FLAC, WAVe, AIFF";
-#if defined(__MAD__) || defined(__APPLE__)
+    QString builtInFormatsStr = "Ogg Vorbis, FLAC, WAVE, AIFF";
+#if defined(__MAD__) || defined(__COREAUDIO__)
     builtInFormatsStr += ", MP3";
+#endif
+#if defined(__MEDIAFOUNDATION__) || defined(__COREAUDIO__) || defined(__FAAD__)
+    builtInFormatsStr += ", M4A/MP4";
 #endif
 #ifdef __OPUS__
     builtInFormatsStr += ", Opus";
 #endif
-#ifdef _MODPLUG_
+#ifdef __MODPLUG__
     builtInFormatsStr += ", ModPlug";
+#endif
+#ifdef __WV__
+    builtInFormatsStr += ", WavPack";
 #endif
     builtInFormats->setText(builtInFormatsStr);
 
@@ -130,10 +136,6 @@ void DlgPrefLibrary::initializeDirList() {
     }
 }
 
-void DlgPrefLibrary::slotExtraPlugins() {
-    QDesktopServices::openUrl(QUrl(MIXXX_ADDONS_URL));
-}
-
 void DlgPrefLibrary::slotResetToDefaults() {
     checkBox_library_scan->setChecked(false);
     checkBox_SyncTrackMetadataExport->setChecked(false);
@@ -143,6 +145,7 @@ void DlgPrefLibrary::slotResetToDefaults() {
     checkBox_show_itunes->setChecked(true);
     checkBox_show_traktor->setChecked(true);
     radioButton_dbclick_bottom->setChecked(false);
+    checkBoxEditMetadataSelectedClicked->setChecked(PREF_LIBRARY_EDIT_METADATA_DEFAULT);
     radioButton_dbclick_top->setChecked(false);
     radioButton_dbclick_deck->setChecked(true);
     spinBoxRowHeight->setValue(Library::kDefaultRowHeightPx);
@@ -167,17 +170,23 @@ void DlgPrefLibrary::slotUpdate() {
             ConfigKey("[Library]","ShowTraktorLibrary"), true));
 
     switch (m_pConfig->getValue<int>(
-            ConfigKey("[Library]","TrackLoadAction"), LOAD_TRACK_DECK)) {
-    case ADD_TRACK_BOTTOM:
+            ConfigKey("[Library]","TrackLoadAction"), LOAD_TO_DECK)) {
+    case ADD_TO_AUTODJ_BOTTOM:
             radioButton_dbclick_bottom->setChecked(true);
             break;
-    case ADD_TRACK_TOP:
+    case ADD_TO_AUTODJ_TOP:
             radioButton_dbclick_top->setChecked(true);
             break;
     default:
             radioButton_dbclick_deck->setChecked(true);
             break;
     }
+
+    bool editMetadataSelectedClick = m_pConfig->getValue(
+            ConfigKey("[Library]","EditMetadataSelectedClick"),
+            PREF_LIBRARY_EDIT_METADATA_DEFAULT);
+    checkBoxEditMetadataSelectedClicked->setChecked(editMetadataSelectedClick);
+    m_pLibrary->setEditMedatataSelectedClick(editMetadataSelectedClick);
 
     m_originalTrackTableFont = m_pLibrary->getTrackTableFont();
     m_iOriginalTrackTableRowHeight = m_pLibrary->getTrackTableRowHeight();
@@ -187,14 +196,14 @@ void DlgPrefLibrary::slotUpdate() {
 
 void DlgPrefLibrary::slotCancel() {
     // Undo any changes in the library font or row height.
-    emit(setTrackTableRowHeight(m_iOriginalTrackTableRowHeight));
-    emit(setTrackTableFont(m_originalTrackTableFont));
+    m_pLibrary->setFont(m_originalTrackTableFont);
+    m_pLibrary->setRowHeight(m_iOriginalTrackTableRowHeight);
 }
 
 void DlgPrefLibrary::slotAddDir() {
     QString fd = QFileDialog::getExistingDirectory(
         this, tr("Choose a music directory"),
-        QDesktopServices::storageLocation(QDesktopServices::MusicLocation));
+        QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
     if (!fd.isEmpty()) {
         emit(requestAddDir(fd));
         slotUpdate();
@@ -270,8 +279,7 @@ void DlgPrefLibrary::slotRelocateDir() {
     if (!dir.exists() && dir.cdUp()) {
         startDir = dir.absolutePath();
     } else if (!dir.exists()) {
-        startDir = QDesktopServices::storageLocation(
-            QDesktopServices::MusicLocation);
+        startDir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
     }
 
     QString fd = QFileDialog::getExistingDirectory(
@@ -300,14 +308,19 @@ void DlgPrefLibrary::slotApply() {
                 ConfigValue((int)checkBox_show_traktor->isChecked()));
     int dbclick_status;
     if (radioButton_dbclick_bottom->isChecked()) {
-            dbclick_status = ADD_TRACK_BOTTOM;
+            dbclick_status = ADD_TO_AUTODJ_BOTTOM;
     } else if (radioButton_dbclick_top->isChecked()) {
-            dbclick_status = ADD_TRACK_TOP;
+            dbclick_status = ADD_TO_AUTODJ_TOP;
     } else {
-            dbclick_status = LOAD_TRACK_DECK;
+            dbclick_status = LOAD_TO_DECK;
     }
     m_pConfig->set(ConfigKey("[Library]","TrackLoadAction"),
                 ConfigValue(dbclick_status));
+
+    m_pConfig->set(ConfigKey("[Library]", "EditMetadataSelectedClick"),
+            ConfigValue(checkBoxEditMetadataSelectedClicked->checkState()));
+    m_pLibrary->setEditMedatataSelectedClick(
+            checkBoxEditMetadataSelectedClicked->checkState());
 
     QFont font = m_pLibrary->getTrackTableFont();
     if (m_originalTrackTableFont != font) {
@@ -326,13 +339,13 @@ void DlgPrefLibrary::slotApply() {
 }
 
 void DlgPrefLibrary::slotRowHeightValueChanged(int height) {
-    emit(setTrackTableRowHeight(height));
+    m_pLibrary->setRowHeight(height);
 }
 
 void DlgPrefLibrary::setLibraryFont(const QFont& font) {
     libraryFont->setText(QString("%1 %2 %3pt").arg(
         font.family(), font.styleName(), QString::number(font.pointSizeF())));
-    emit(setTrackTableFont(font));
+    m_pLibrary->setFont(font);
 
     // Don't let the row height exceed the library height.
     QFontMetrics metrics(font);
@@ -351,6 +364,13 @@ void DlgPrefLibrary::slotSelectFont() {
     if (ok) {
         setLibraryFont(font);
     }
+}
+
+void DlgPrefLibrary::slotSearchDebouncingTimeoutMillisChanged(int searchDebouncingTimeoutMillis) {
+    m_pConfig->setValue(
+            kSearchDebouncingTimeoutMillisKey,
+            searchDebouncingTimeoutMillis);
+    WSearchLineEdit::setDebouncingTimeoutMillis(searchDebouncingTimeoutMillis);
 }
 
 void DlgPrefLibrary::slotSyncTrackMetadataExportToggled() {

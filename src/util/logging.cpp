@@ -15,13 +15,18 @@
 #include <QtDebug>
 #include <QtGlobal>
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+#include <QLoggingCategory>
+#endif
+
 #include "controllers/controllerdebug.h"
 #include "util/assert.h"
 
 namespace mixxx {
 
 // Initialize the log level with the default value
-LogLevel Logging::s_logLevel = LogLevel::Default;
+LogLevel g_logLevel = kLogLevelDefault;
+LogLevel g_logFlushLevel = kLogFlushLevelDefault;
 
 namespace {
 
@@ -79,18 +84,21 @@ void MessageHandler(QtMsgType type,
 #endif
             shouldPrint = Logging::enabled(LogLevel::Debug) ||
                     isControllerDebug;
+            shouldFlush = Logging::flushing(LogLevel::Debug);
             break;
 #if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
         case QtInfoMsg:
             tag = "Info [";
             baSize += strlen(tag);
             shouldPrint = Logging::enabled(LogLevel::Info);
+            shouldFlush = Logging::flushing(LogLevel::Info);
             break;
 #endif
         case QtWarningMsg:
             tag = "Warning [";
             baSize += strlen(tag);
             shouldPrint = Logging::enabled(LogLevel::Warning);
+            shouldFlush = Logging::flushing(LogLevel::Warning);
             break;
         case QtCriticalMsg:
             tag = "Critical [";
@@ -176,14 +184,17 @@ void MessageHandler(QtMsgType type,
 }  // namespace
 
 // static
-void Logging::initialize(const QDir& settingsDir, LogLevel logLevel,
+void Logging::initialize(const QDir& settingsDir,
+                         LogLevel logLevel,
+                         LogLevel logFlushLevel,
                          bool debugAssertBreak) {
     VERIFY_OR_DEBUG_ASSERT(!g_logfile.isOpen()) {
         // Somebody already called Logging::initialize.
         return;
     }
 
-    s_logLevel = logLevel;
+    g_logLevel = logLevel;
+    g_logFlushLevel = logFlushLevel;
 
     QString logFileName;
 
@@ -199,7 +210,7 @@ void Logging::initialize(const QDir& settingsDir, LogLevel logLevel,
             QString olderlogname =
                     settingsDir.filePath(QString("mixxx.log.%1").arg(i + 1));
             // This should only happen with number 10
-            if (QFileInfo(olderlogname).exists()) {
+            if (QFileInfo::exists(olderlogname)) {
                 QFile::remove(olderlogname);
             }
             if (!QFile::rename(logFileName, olderlogname)) {
@@ -221,6 +232,17 @@ void Logging::initialize(const QDir& settingsDir, LogLevel logLevel,
 #else
     qInstallMessageHandler(MessageHandler);
 #endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+    // Ugly hack around distributions disabling debugging in Qt applications.
+    // This restores the default Qt behavior. It is required for getting useful
+    // logs from users and for developing controller mappings.
+    // Fedora: https://bugzilla.redhat.com/show_bug.cgi?id=1227295
+    // Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=886437
+    // Ubuntu: https://bugs.launchpad.net/ubuntu/+source/qtbase-opensource-src/+bug/1731646
+    QLoggingCategory::setFilterRules("*.debug=true\n"
+                                     "qt.*.debug=false");
+#endif
 }
 
 // static
@@ -237,6 +259,14 @@ void Logging::shutdown() {
     QMutexLocker locker(&g_mutexLogfile);
     if (g_logfile.isOpen()) {
         g_logfile.close();
+    }
+}
+
+// static
+void Logging::flushLogFile() {
+    QMutexLocker locker(&g_mutexLogfile);
+    if (g_logfile.isOpen()) {
+        g_logfile.flush();
     }
 }
 

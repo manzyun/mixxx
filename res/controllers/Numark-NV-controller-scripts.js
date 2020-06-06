@@ -32,20 +32,18 @@ NumarkNV.Deck.prototype.rateRangeHandler = function(value){
  * = Configration Options
  ********************************************/
 // Read official user guide for details.
-// I scripting near behavior on userguide.
-// = Filter roll and Filter fx mode config.
-// chain filter channel. 1 to 4
-var filterfx_channel = 4;
+// I was scripting near behavior on userguide.
+// chain filter channel. 1 to 2
 var multiPressTimeout = 50; // Multi press time out. milisecs.
 
 
 /**************************
  * Constants for scratching :
  **************************/
-var intervalsPerRev = 1200, // or 556
-  rpm = 33 + 1 / 3, //Like a real vinyl !!! :)
-  alpha = 1 / 8, //Adjust to suit.
-  beta = alpha / 32; //Adjust to suit.
+var intervalsPerRev = 5600; 
+var rpm = 33 + 1 / 3;
+var alpha = 1 / 8;
+var beta = alpha / 32;
 
 /********************************
 * Numark NV Controller Script.
@@ -98,10 +96,6 @@ var connectedFunctions = [
   'padAction.cues'
 ];
 
-var controlNames = [
-
-];
-
 var channelsString = [
   '[Channel1]', '[Channel2]', '[Channel3]', '[Channel4]'
 ];
@@ -110,9 +104,6 @@ var numarkNV = {
   'shift': false,
   'pad_mode': [0x1A, 0x1A, 0x1A, 0x1A],
   'rate_range': [0.08, 0.08, 0.08, 0.08],
-  'filter_roll': false,
-  'filter_fx': false,
-  'touch_mode': false
 };
 
 numarkNV.activeButtons = {};
@@ -184,8 +175,8 @@ numarkNV.Scratch = {
     numarkNV.Scratch.old_value = value
 
     if (engine.getParameter(group, 'play') == false) {
-      engine.scratchEnable(deck, intervalsPerRev, rpm, alpha, beta);
-      engine.scratchTick(deck, adjustedJog); // Scratch!
+      engine.scratchEnable(_deck, intervalsPerRev, rpm, alpha, beta);
+      engine.scratchTick(_deck, _adjustedJog); // Scratch!
       var _gammaInputRange = 13; // Max jog speed
       var _maxOutFraction = 0.8; // Where on the curve it should peak; 0.5 is half-way
       var _sensitivity = 0.5; // Adjustment gamma
@@ -206,178 +197,6 @@ numarkNV.Scratch = {
     }
   }
 }
-
-/* = Touch Effect */
-/* If the Touch Effect mode enabled, you can touch EQ and quic effects knob touch controll */
-numarkNV.touchModePushed = function touchModePushed(channel, control, value, status, group) {
-  numarkNV.touchMode.touch_mode = !numarkNV.touchMode.touch_mode
-}
-/* TODO I don't know EQ killing...
-numarkNV.touchMode = {
-  ch1: {
-    high: function (channel, control, value, status, group) {
-
-    },
-    mid: function (channel, control, value, status, group) {
-
-    },
-    low: function (channel, control, value, status, group) {
-
-    },
-    super: function (channel, control, value, status, group) {
-
-    },
-    fx1: function (channel, control, value, status, group) {
-
-    },
-    fx2 = function (channel, control, value, status, group) {
-
-    },
-    fx3 = function (channel, control, value, status, group) {
-
-    }
-  },
-
-  ch2: {
-    high: function (channel, control, value, status, group) {
-
-    },
-    mid: function (channel, control, value, status, group) {
-
-    },
-    low: function (channel, control, value, status, group) {
-
-    },
-    super: function (channel, control, value, status, group) {
-
-    },
-    fx1: function (channel, control, value, status, group) {
-
-    },
-    fx2 = function (channel, control, value, status, group) {
-
-    },
-    fx3 = function (channel, control, value, status, group) {
-
-    }
-  },
-
-  ch3: {
-    high: function (channel, control, value, status, group) {
-
-    },
-    mid: function (channel, control, value, status, group) {
-
-    },
-    low: function (channel, control, value, status, group) {
-
-    },
-    super: function (channel, control, value, status, group) {
-
-    },
-    fx1: function (channel, control, value, status, group) {
-
-    },
-    fx2 = function (channel, control, value, status, group) {
-
-    },
-    fx3 = function (channel, control, value, status, group) {
-
-    }
-  },
-
-  ch4: {
-    high: function (channel, control, value, status, group) {
-
-    },
-    mid: function (channel, control, value, status, group) {
-
-    },
-    low: function (channel, control, value, status, group) {
-
-    },
-    super: function (channel, control, value, status, group) {
-
-    },
-    fx1: function (channel, control, value, status, group) {
-
-    },
-    fx2 = function (channel, control, value, status, group) {
-
-    },
-    fx3 = function (channel, control, value, status, group) {
-
-    }
-  }
-} */
-
-/* = filterRoll Section */
-numarkNV.filterRoll = function filterRoll(channel, controll, value, status) {
-  if (numarkNV.filter_roll) {
-    var _ch = mixer_channel[controll - 0x0D - 1] // Because mixer channel is 0xND
-    if (vale <= 0x0F) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[7] + '_enabled', 1)
-    } else if (value <= 0x1E) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[6] + '_enabled', 1)
-    } else if (value <= 0x2D) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[5] + '_enabled', 1)
-    } else if (value <= 0x3C) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[4] + '_enabled', 1)
-    } else if (value <= 0x4B) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[3] + '_enabled', 1)
-    } else if (value <= 0x5a) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[2] + '_enabled', 1)
-    } else if (value <= 0x69) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[1] + '_enabled', 1)
-    } else {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[0] + '_enabled', 1)
-    }
-  }
-}
-numarkNV.filterRollFx = function filterRollFx(channel, controll, value, status, group) {
-  if (numarkNV.filter_fx) {
-    var _ch = mixer_channel[controll - 0x0D - 1]
-    var _wet = value / 127
-    engine.setParameter('[EffectRack1_EffectUnit' + filterfx_channel +
-      ']', 'enabled', 1)
-    engine.setParameter('[EffectRack1_EffectUnit' + filterfx_channel +
-      ']', 'mix', wet)
-    if (vale <= 0x0F) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[7] + '_enabled', 1)
-    } else if (value <= 0x1E) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[6] + '_enabled', 1)
-    } else if (value <= 0x2D) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[5] + '_enabled', 1)
-    } else if (value <= 0x3C) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[4] + '_enabled', 1)
-    } else if (value <= 0x4B) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[3] + '_enabled', 1)
-    } else if (value <= 0x5a) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[2] + '_enabled', 1)
-    } else if (value <= 0x69) {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[1] + '_enabled', 1)
-    } else {
-      engine.setParameter('[Channel' + _ch + ']', 'beatloop_' +
-        loop_number[0] + '_enabled', 1)
-    }
-  }
-}
-/* ---------------------------------- */
 
 /* = Rate Knob
 /* Because, this controller max value 7F. */
@@ -410,12 +229,7 @@ numarkNV.unShiftedButtons = {
   },
 
   bleep: function bleep(channel, control, value, status, group) {
-    engine.setParameter(group, 'reverseroll', value ? 1 : 0);
-  },
-
-  filterRollMode: function felterRollMode(channel, control, value, status, group) {
-    numarkNV.filter_fx = false;
-    numarkNV.FilterRollMode.filter_roll_mode = !numarkNV.filter_roll;
+    engine.setParameter(group, 'reverseroll', !(engine.getParameter(group, 'reverseroll')));
   },
 
   monitor: {
@@ -754,13 +568,13 @@ numarkNV.unShiftedButtons = {
 
 /* = Shft Button Section */
 numarkNV.shiftedButtons = {
-  play: function play(channel, control, value, status, group) {
+  play: function shutter(channel, control, value, status, group) {
     if (value) {
       engine.setParameter(group, 'play_stutter', !(engine.getParameter(group, 'play_stutter')));
     }
   },
 
-  cue: function cue(channel, control, value, status, group) {
+  cue: function to_head(channel, control, value, status, group) {
     if (value) {
       engine.setParameter(group, 'start_stop', !(engine.getParameter(group, 'start_stop')));
     }
@@ -773,21 +587,16 @@ numarkNV.shiftedButtons = {
     }
   },
 
-  bleep: function bleep(channel, control, value, status, group) {
-    if (value) {
+  bleep: function reverse(channel, control, value, status, group) {
+    if (value == numarkNV.on_off.ON) {
       engine.setParameter(group, 'reverse', 1);
     } else {
       engine.setParameter(group, 'reverse', 0);
     }
   },
 
-  filterRollMode: function fillterRollMode(channel, control, value, status, group) {
-    numarkNV.FilterRolMode.filter_roll_mode = false;
-    numarkNV.FilterRolFx.filter_fx_mode = !numarkNV.FilterRolFx.filter_fx_mode;
-  },
-
   monitor: {
-    range: function range(channel, control, value, status, group) {
+    range: function keylock(channel, control, value, status, group) {
       if (value) {
         if (value) {
           engine.setParameter(group, 'keylock', !(
@@ -797,25 +606,11 @@ numarkNV.shiftedButtons = {
       }
     },
 
-    load: function load(channel, control, value, status, group) {
+    load: function prev(channel, control, value, status, group) {
       if (value) {
         engine.setParameter('[PreviewDeck1]',
           'LoadSelectedTrackAndPlay', 1);
       }
-    }
-  },
-
-  fx: {
-    fx1: function fx1(channel, control, value, status, group) {
-      engine.setParameter('[EffectRack1_EffectUnit1]', 'next_chain', 1)
-    },
-
-    fx2: function fx2(channel, control, value, status, group) {
-      engine.setParameter('[EffectRack1_EffectUnit2]', 'next_chain', 1)
-    },
-
-    fx3: function fx3(channel, control, value, status, group) {
-      engine.setParameter('[EffectRack1_EffectUnit3]', 'next_chain', 1)
     }
   },
 
@@ -1105,16 +900,15 @@ numarkNV.shiftButton = function shiftButton(channel, control, value, status, gro
   // disConnectiedMapping
   for (i = 0; i < channelsString.length - 1; i++) {
     for (j = 0; j < connectedFunctions.length - 1; j++) {
-      print('j is: ' + j);
       engine.connectControl(channelsString[i], 'unShiftedButtons.' + connectedFunctions[j], true);
     }
   }
   for (i = 0; i < channelsString.length - 1; i++) {
     for (j = 0; j < connectedFunctions.length - 1; j++) {
-      engine.connectControl(channelsString[i], 'ShiftedButtons.' + connectedFunctions[j]);
+      engine.connectControl(channelsString[i], 'ShiftedButtons.' + connectedFunctions[j], false);
     }
   }
-  numarkNV.activeButtons = numarkNV.shiftedButton;
+  numarkNV.activeButtons = numarkNV.shiftedButtons;
 }
 
 numarkNV.releaseShiftButton = function releaseShiftButton (channel, control, value, status, group) {
@@ -1127,7 +921,7 @@ numarkNV.releaseShiftButton = function releaseShiftButton (channel, control, val
   }
   for (i = 0; i < channelsString.length - 1; i++) {
     for (j = 0; j < connectedFunctions.length - 1; j++) {
-      engine.connectControl(channelsString[i], 'unShiftedButtons.' + connectedFunctions[j]);
+      engine.connectControl(channelsString[i], 'unShiftedButtons.' + connectedFunctions[j], false);
     }
   }
   numarkNV.activeButtons = numarkNV.unShiftedButtons;

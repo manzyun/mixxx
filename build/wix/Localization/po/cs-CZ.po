@@ -1,19 +1,21 @@
 # 
 # Translators:
+# Filip Klačanský <klacanskyf@protonmail.com>, 2018
 # fri, 2016-2017
+# S.Brandt <s.brandt@mixxx.org>, 2018
 # Sebastien BLAISOT <sebastien@blaisot.org>, 2016
 # Sebastien BLAISOT <sebastien@blaisot.org>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: Mixxx DJ Windows installer\n"
-"PO-Revision-Date: 2017-07-15 15:06+0000\n"
-"Last-Translator: Sebastien BLAISOT <sebastien@blaisot.org>\n"
+"PO-Revision-Date: 2018-12-16 20:48+0000\n"
+"Last-Translator: S.Brandt <s.brandt@mixxx.org>\n"
 "Language-Team: Czech (Czech Republic) (http://www.transifex.com/mixxx-dj-software/mixxxdj-windows-installer/language/cs_CZ/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Language: cs_CZ\n"
-"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+"Plural-Forms: nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;\n"
 
 #.  Programm informations
 msgctxt "ApplicationName"
@@ -39,8 +41,8 @@ msgstr "Nainstaluje Mixxx"
 #.  Error messages
 #.  DO NOT BREAK LINES BECAUSE LINE BREAKS WILL SHOW UP AS-IS IN THE INTERFACE
 msgctxt "OS2Old"
-msgid "This product requires Windows XP or above."
-msgstr "Tento výrobek vyžaduje Windows XP nebo vyšší."
+msgid "This product requires Windows 7 or above."
+msgstr "Tento výrobek vyžaduje Windows 7 nebo vyšší."
 
 msgctxt "NewerInstalled"
 msgid "The same or a newer version of this product is already installed."
@@ -58,10 +60,10 @@ msgstr "Do 32bitových Windows musíte nainstalovat 32bitovou verzi tohoto výro
 
 msgctxt "x86VersionWarning"
 msgid ""
-"You are about to install the 32-bit version on a 64-bit operating system.\r\n"
-"We recommend using the 64-bit version for better performance.\r\n"
-"You can download the 64-bit installation package from http://mixxx.org/download/"
-msgstr "Chystáte se nainstalovat 32bitovou verzi do 64bitového operačního systému.\nDoporučujeme použít 64bitovou verzi kvůli lepšímu výkonu.\nInstalační balíček pro 64bitový systém můžete stáhnout z http://mixxx.org/download/"
+"You are about to install the 32-bit version on a 64-bit operating system. We"
+" recommend using the 64-bit version for better performance. You can download"
+" the 64-bit installation package from http://mixxx.org/download/"
+msgstr "Chystáte se nainstalovat 32bitovou verzi do 64bitového operačního systému. Doporučujeme použít 64bitovou verzi kvůli lepšímu výkonu. Instalační balíček pro 64bitový systém můžete stáhnout z http://mixxx.org/download/"
 
 msgctxt "XPWarning"
 msgid ""
@@ -163,7 +165,7 @@ msgstr "Zdrojové soubory, které Mixxx umožní provedení instalace Mixxxu v j
 #.  Bootstrapper
 msgctxt "Caption"
 msgid "[WixBundleName] Setup"
-msgstr ""
+msgstr "[wixBundleName]Instalace"
 
 msgctxt "Title"
 msgid "[WixBundleName]"
@@ -171,15 +173,15 @@ msgstr ""
 
 msgctxt "ConfirmCancelMessage"
 msgid "Are you sure you want to cancel?"
-msgstr ""
+msgstr "Chcete opravdu ukončit instalaci ? "
 
 msgctxt "ExecuteUpgradeRelatedBundleMessage"
 msgid "Previous version"
-msgstr ""
+msgstr "Předchozí verze"
 
 msgctxt "HelpHeader"
 msgid "Setup Help"
-msgstr ""
+msgstr "Nápověda k instalaci."
 
 msgctxt "HelpText"
 msgid ""
@@ -197,158 +199,158 @@ msgstr ""
 
 msgctxt "HelpCloseButton"
 msgid "&Close"
-msgstr ""
+msgstr "Zavřít."
 
 msgctxt "InstallHeader"
 msgid "Welcome"
-msgstr ""
+msgstr "Vítejte."
 
 msgctxt "InstallMessage"
 msgid ""
 "Setup will install Mixxx on your computer.\n"
 "It will first install required third party libraries, then Mixxx itself.\n"
 "Click Install to continue or Close to exit."
-msgstr ""
+msgstr "Mixx bude nainstalován na váš počítač.\nNejprve nainstaluje požadované knihovny, potom samotní Mixx.\nKliknete Instalovat pro pokračování nebo Zavřít pro ukončení."
 
 msgctxt "InstallVersion"
 msgid "Version [WixBundleVersion]"
-msgstr ""
+msgstr "Verze [WixBundleVersion]"
 
 msgctxt "InstallOptionsButton"
 msgid "&Options"
-msgstr ""
+msgstr "Možnosti"
 
 msgctxt "InstallInstallButton"
 msgid "&Install"
-msgstr ""
+msgstr "Instalovat"
 
 msgctxt "InstallCloseButton"
 msgid "&Close"
-msgstr ""
+msgstr "Ukončit"
 
 msgctxt "OptionsHeader"
 msgid "Setup Options"
-msgstr ""
+msgstr "Nastavení instalace"
 
 msgctxt "OptionsLocationLabel"
 msgid "Install location:"
-msgstr ""
+msgstr "Umístnení instalace"
 
 msgctxt "OptionsBrowseButton"
 msgid "&Browse"
-msgstr ""
+msgstr "Prohledávat"
 
 msgctxt "OptionsOkButton"
 msgid "&OK"
-msgstr ""
+msgstr "OK"
 
 msgctxt "OptionsCancelButton"
 msgid "&Cancel"
-msgstr ""
+msgstr "Ukončit"
 
 msgctxt "FilesInUseHeader"
 msgid "Files In Use"
-msgstr ""
+msgstr "Používané soubory"
 
 msgctxt "FilesInUseLabel"
 msgid "The following applications are using files that need to be updated:"
-msgstr ""
+msgstr "Tyto aplikace používají soubory, které je třeba aktualizovat:"
 
 msgctxt "FilesInUseCloseRadioButton"
 msgid "Close the &applications and attempt to restart them."
-msgstr ""
+msgstr "Zavřít aplikace a pokusit se je restartovat. "
 
 msgctxt "FilesInUseDontCloseRadioButton"
 msgid "&Do not close applications. A reboot will be required."
-msgstr ""
+msgstr "Nezavírejte tyto aplikace. Požaduje se restart. "
 
 msgctxt "FilesInUseOkButton"
 msgid "&OK"
-msgstr ""
+msgstr "OK"
 
 msgctxt "FilesInUseCancelButton"
 msgid "&Cancel"
-msgstr ""
+msgstr "Ukončit"
 
 msgctxt "ProgressHeader"
 msgid "Setup Progress"
-msgstr ""
+msgstr "Průběh instalace"
 
 msgctxt "ProgressLabel"
 msgid "Processing:"
-msgstr ""
+msgstr "Spracováva se: "
 
 msgctxt "OverallProgressPackageText"
 msgid "Initializing..."
-msgstr ""
+msgstr "Načítávam..."
 
 msgctxt "ProgressCancelButton"
 msgid "&Cancel"
-msgstr ""
+msgstr "Ukončit"
 
 msgctxt "ModifyHeader"
 msgid "Modify Setup"
-msgstr ""
+msgstr "Upravit Instalaci"
 
 msgctxt "ModifyRepairButton"
 msgid "&Repair"
-msgstr ""
+msgstr "Opravit"
 
 msgctxt "ModifyUninstallButton"
 msgid "&Uninstall"
-msgstr ""
+msgstr "Odinstalovat"
 
 msgctxt "ModifyCloseButton"
 msgid "&Close"
-msgstr ""
+msgstr "Ukončit"
 
 msgctxt "SuccessHeader"
 msgid "Setup Successful"
-msgstr ""
+msgstr "Instalace úspěšná"
 
 msgctxt "SuccessInstallHeader"
 msgid "Mixxx installation has been successful"
-msgstr ""
+msgstr "Mixxx byl úspěšne nainstalován"
 
 msgctxt "SuccessRepairHeader"
 msgid "Mixxx repair has been successful"
-msgstr ""
+msgstr "Mixxx byl úspěšne nainstalován"
 
 msgctxt "SuccessUninstallHeader"
 msgid "Mixxx uninstall has been successful"
-msgstr ""
+msgstr "Mixx byl úspěšne odinstalován"
 
 msgctxt "SuccessLaunchButton"
 msgid "&Launch"
-msgstr ""
+msgstr "Spustit"
 
 msgctxt "SuccessRestartText"
 msgid "You must restart your computer before you can use the software."
-msgstr ""
+msgstr "Prosím restartujte počítač pro bezchybný chod softwaru. "
 
 msgctxt "SuccessRestartButton"
 msgid "&Restart"
-msgstr ""
+msgstr "Restartovat"
 
 msgctxt "SuccessCloseButton"
 msgid "&Close"
-msgstr ""
+msgstr "Ukončit"
 
 msgctxt "FailureHeader"
 msgid "Setup Failed"
-msgstr ""
+msgstr "Instalace se nezdařila"
 
 msgctxt "FailureInstallHeader"
 msgid "Mixxx installation failed"
-msgstr ""
+msgstr "Mixxx instalace zlyhala"
 
 msgctxt "FailureRepairHeader"
 msgid "Mixxx repair failed"
-msgstr ""
+msgstr "Mixxx oprava zlyhala"
 
 msgctxt "FailureUninstallHeader"
 msgid "Mixxx uninstall failed"
-msgstr ""
+msgstr "Mixxx odinstalování zlyhalo"
 
 msgctxt "FailureHyperlinkLogText"
 msgid ""
@@ -359,12 +361,12 @@ msgstr ""
 msgctxt "FailureRestartText"
 msgid ""
 "You must restart your computer to complete the rollback of the software."
-msgstr ""
+msgstr "Je potřebné restartovat počítač pro dokončení vrácení instalace."
 
 msgctxt "FailureRestartButton"
 msgid "&Restart"
-msgstr ""
+msgstr "Restartovat"
 
 msgctxt "FailureCloseButton"
 msgid "&Close"
-msgstr ""
+msgstr "Ukončit"
