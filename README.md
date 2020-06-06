@@ -1,3 +1,47 @@
+# How About This Fork Repository
+
+This is a personal repository I created to motivate people to use Numark NV with Mixxx.
+
+The master branch of this repository is responsible for adding scripts for that purpose, and upstream changes are very infrequent.
+
+Also, only the following files are edited in this repository.
+
+- `res/controllers/Numark-NV.midi.xml`
+- `res/controllers/Numark-NV-controller-scripts.js`
+
+## What I'm Working On Right Now
+
+- [ ] Research about can write ES6.
+  - [ ] Rewriting ES6
+  - [ ] Or CoffeeScript
+
+## Editing Environment
+
+- [Ubuntu](https://ubuntu.com/) 20.04 LTS
+- [DOOM Emacs](https://github.com/hlissner/doom-emacs)
+- [Mixxx](https://flathub.org/apps/details/org.mixxx.Mixxx) on [Flatpak](https://flatpak.org) from repository [Flathub](https://flathub.org)
+
+## Summary Branches
+
+- `master` : For now, what we are currently able to move.
+- any other branches : My work in progress branches.
+- `upstream` remote : upstream repository, or this [mixxxdj/mixxx](https://github.com/mixxxdj/mixxx)
+
+## Using Result
+
+Forgive me for being an amateur mix:
+
+<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&feed=%2Fmanzyun%2Funknown-28%2F" frameborder="0" ></iframe>
+<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&feed=%2Fmanzyun%2Fglobal-game-jam-2019-in-spporo-morning-shot-mix-%2F" frameborder="0" ></iframe>
+<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Flove-for-the-music-laboratory-cube-has-gone-idle-mix%2F" frameborder="0" ></iframe>
+<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Ffavorite-songs-in-soundcloud-mix%2F" frameborder="0" ></iframe>
+<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Fkita-beats-vol1-retake-and-numark-nv-on-mixxx-test-drive%2F" frameborder="0" ></iframe>
+<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&light=1&feed=%2Fmanzyun%2Fshort-summer-in-hokkaido-mix%2F" frameborder="0" ></iframe>
+
+---
+
+In addition, the following documents are the same as the mainstream ones.
+
 # Mixxx
 [![GitHub latest tag](https://img.shields.io/github/tag/mixxxdj/mixxx.svg)](https://www.mixxx.org/download)
 [![Packaging status](https://repology.org/badge/tiny-repos/mixxx.svg)](https://repology.org/metapackage/mixxx/versions)
