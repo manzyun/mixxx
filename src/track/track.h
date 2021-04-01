@@ -2,6 +2,7 @@
 
 #include <QList>
 #include <QMutex>
+#include <QMutexLocker>
 #include <QObject>
 #include <QUrl>
 
@@ -10,26 +11,11 @@
 #include "track/beats.h"
 #include "track/cue.h"
 #include "track/cueinfoimporter.h"
+#include "track/track_decl.h"
 #include "track/trackfile.h"
 #include "track/trackrecord.h"
-#include "util/memory.h"
 #include "util/sandbox.h"
 #include "waveform/waveform.h"
-
-// forward declaration(s)
-class Track;
-
-typedef std::shared_ptr<Track> TrackPointer;
-typedef std::weak_ptr<Track> TrackWeakPointer;
-typedef QList<TrackPointer> TrackPointerList;
-
-Q_DECLARE_METATYPE(TrackPointer);
-
-enum class ExportTrackMetadataResult {
-    Succeeded,
-    Failed,
-    Skipped,
-};
 
 class Track : public QObject {
     Q_OBJECT
@@ -67,7 +53,7 @@ class Track : public QObject {
     Q_PROPERTY(QString track_total READ getTrackTotal WRITE setTrackTotal)
     Q_PROPERTY(int times_played READ getTimesPlayed)
     Q_PROPERTY(QString comment READ getComment WRITE setComment)
-    Q_PROPERTY(double bpm READ getBpm WRITE setBpm)
+    Q_PROPERTY(double bpm READ getBpm)
     Q_PROPERTY(QString bpmFormatted READ getBpmText STORED false)
     Q_PROPERTY(QString key READ getKeyText WRITE setKeyText)
     Q_PROPERTY(double duration READ getDuration)
@@ -107,7 +93,7 @@ class Track : public QObject {
     int getChannels() const;
 
     // Get sample rate
-    int getSampleRate() const;
+    mixxx::audio::SampleRate getSampleRate() const;
 
     // Sets the bitrate
     void setBitrate(int);
@@ -139,16 +125,20 @@ class Track : public QObject {
         return getDurationText(mixxx::Duration::Precision::MILLISECONDS);
     }
 
-    // Set BPM
-    double setBpm(double);
+    // Sets the BPM if not locked.
+    bool trySetBpm(double bpm);
+
     // Returns BPM
-    double getBpm() const;
+    double getBpm() const {
+        const QMutexLocker lock(&m_qMutex);
+        return getBpmWhileLocked().getValue();
+    }
     // Returns BPM as a string
     QString getBpmText() const;
 
     // A track with a locked BPM will not be re-analyzed by the beats or bpm
     // analyzer.
-    void setBpmLocked(bool bpmLocked = true);
+    void setBpmLocked(bool bpmLocked);
     bool isBpmLocked() const;
 
     // Set ReplayGain
@@ -192,7 +182,7 @@ class Track : public QObject {
     // Returns the track color
     mixxx::RgbColor::optional_t getColor() const;
     // Sets the track color
-    void setColor(mixxx::RgbColor::optional_t);
+    void setColor(const mixxx::RgbColor::optional_t&);
     // Returns the user comment
     QString getComment() const;
     // Sets the user commnet
@@ -225,10 +215,18 @@ class Track : public QObject {
         return getPlayCounter().getTimesPlayed();
     }
 
+    QDateTime getLastPlayedAt() const {
+        return getPlayCounter().getLastPlayedAt();
+    }
+
     // Returns rating
     int getRating() const;
     // Sets rating
     void setRating(int);
+    /// Resets the rating
+    void resetRating() {
+        setRating(mixxx::TrackRecord::kNoRating);
+    }
 
     // Get URL for track
     QString getURL() const;
@@ -263,16 +261,23 @@ class Track : public QObject {
     void analysisFinished();
 
     // Calls for managing the track's cue points
-    CuePointer createAndAddCue();
+    CuePointer createAndAddCue(
+            mixxx::CueType type,
+            int hotCueIndex,
+            double sampleStartPosition,
+            double sampleEndPosition);
     CuePointer findCueByType(mixxx::CueType type) const; // NOTE: Cannot be used for hotcues.
-    CuePointer findCueById(int id) const;
+    CuePointer findCueById(DbId id) const;
     void removeCue(const CuePointer& pCue);
     void removeCuesOfType(mixxx::CueType);
-    QList<CuePointer> getCuePoints() const;
+    QList<CuePointer> getCuePoints() const {
+        // Copying implicitly shared collections is thread-safe
+        return m_cuePoints;
+    }
 
     void setCuePoints(const QList<CuePointer>& cuePoints);
 
-    enum class CueImportStatus {
+    enum class ImportStatus {
         Pending,
         Complete,
     };
@@ -281,17 +286,28 @@ class Track : public QObject {
     ///
     /// If the list is empty it tries to complete any pending
     /// import and returns the corresponding status.
-    CueImportStatus importCueInfos(
+    ImportStatus importCueInfos(
             mixxx::CueInfoImporterPointer pCueInfoImporter);
-    CueImportStatus getCueImportStatus() const;
+    ImportStatus getCueImportStatus() const;
 
     bool isDirty();
 
     // Get the track's Beats list
     mixxx::BeatsPointer getBeats() const;
 
-    // Set the track's Beats
-    void setBeats(mixxx::BeatsPointer beats);
+    // Set the track's Beats if not locked
+    bool trySetBeats(mixxx::BeatsPointer pBeats);
+    bool trySetAndLockBeats(mixxx::BeatsPointer pBeats);
+
+    /// Imports the given list of cue infos as cue points,
+    /// thereby replacing all existing cue points!
+    ///
+    /// If the list is empty it tries to complete any pending
+    /// import and returns the corresponding status.
+    ImportStatus tryImportBeats(
+            mixxx::BeatsImporterPointer pBeatsImporter,
+            bool lockBpmAfterSet);
+    ImportStatus getBeatsImportStatus() const;
 
     void resetKeys();
     void setKeys(const Keys& keys);
@@ -310,15 +326,13 @@ class Track : public QObject {
     // If the corresponding image has already been loaded it
     // could be provided as a parameter to avoid reloading
     // if actually needed.
-    bool refreshCoverImageHash(
+    bool refreshCoverImageDigest(
             const QImage& loadedImage = QImage());
-
-    quint16 getCoverHash() const;
 
     // Set/get track metadata and cover art (optional) all at once.
     void importMetadata(
             mixxx::TrackMetadata importedMetadata,
-            QDateTime metadataSynchronized = QDateTime());
+            const QDateTime& metadataSynchronized = QDateTime());
     // Merge additional metadata that is not (yet) stored in the database
     // and only available from file tags.
     void mergeImportedMetadata(
@@ -347,6 +361,8 @@ class Track : public QObject {
             mixxx::audio::SampleRate sampleRate,
             mixxx::audio::Bitrate bitrate,
             mixxx::Duration duration);
+    void setAudioProperties(
+            const mixxx::audio::StreamInfo& streamInfo);
 
   signals:
     void waveformUpdated();
@@ -357,7 +373,7 @@ class Track : public QObject {
     void keyUpdated(double key);
     void keysUpdated();
     void replayGainUpdated(mixxx::ReplayGain replayGain);
-    void colorUpdated(mixxx::RgbColor::optional_t color);
+    void colorUpdated(const mixxx::RgbColor::optional_t& color);
     void cuesUpdated();
     void analyzed();
 
@@ -367,15 +383,13 @@ class Track : public QObject {
 
   private slots:
     void slotCueUpdated();
-    void slotBeatsUpdated();
 
   private:
-    // Set a unique identifier for the track. Only used by
-    // GlobalTrackCacheResolver!
+    /// Set a unique identifier for the track.
+    /// Only used by GlobalTrackCacheResolver when the track is saved to db for the first time
     void initId(TrackId id);
-    // Reset the unique identifier after purged from library
-    // which undos a previous add. Only used by
-    // GlobalTrackCacheResolver!
+    /// Remove the TrackId.
+    /// Only used by GlobalTrackCacheResolver when the track is purged from the library
     void resetId();
 
     void relocate(
@@ -385,12 +399,48 @@ class Track : public QObject {
     // Set whether the TIO is dirty or not and unlock before emitting
     // any signals. This must only be called from member functions
     // while the TIO is locked.
-    void markDirtyAndUnlock(QMutexLocker* pLock, bool bDirty = true);
+    void markDirtyAndUnlock(QMutexLocker* pLock) {
+        setDirtyAndUnlock(pLock, true);
+    }
     void setDirtyAndUnlock(QMutexLocker* pLock, bool bDirty);
 
-    void setBeatsAndUnlock(QMutexLocker* pLock, mixxx::BeatsPointer pBeats);
-
     void afterKeysUpdated(QMutexLocker* pLock);
+    void emitKeysUpdated(mixxx::track::io::key::ChromaticKey newKey);
+
+    void afterBeatsAndBpmUpdated(QMutexLocker* pLock);
+    void emitBeatsAndBpmUpdated(mixxx::Bpm newBpm);
+
+    /// Sets beats and returns a boolean to indicate if BPM/Beats were updated.
+    /// Only supposed to be called while the caller guards this a lock.
+    bool setBeatsWhileLocked(mixxx::BeatsPointer pBeats);
+
+    /// Imports pending beats from a BeatImporter and returns a boolean to
+    /// indicate if BPM/beats were updated. Only supposed to be called while
+    /// the caller guards this a lock.
+    bool importPendingBeatsWhileLocked();
+
+    /// Sets cue points and returns a boolean to indicate if cues were updated.
+    /// Only supposed to be called while the caller guards this a lock.
+    bool setCuePointsWhileLocked(const QList<CuePointer>& cuePoints);
+
+    /// Imports pending cues from a CueInfoImporter and returns a boolean to
+    /// indicate if cues were updated. Only supposed to be called while the
+    /// caller guards this a lock.
+    bool importPendingCueInfosWhileLocked();
+
+    mixxx::Bpm getBpmWhileLocked() const;
+    bool trySetBpmWhileLocked(double bpmValue);
+    bool trySetBeatsWhileLocked(
+            mixxx::BeatsPointer pBeats,
+            bool lockBpmAfterSet = false);
+
+    bool trySetBeatsMarkDirtyAndUnlock(
+            QMutexLocker* pLock,
+            mixxx::BeatsPointer pBeats,
+            bool lockBpmAfterSet);
+    bool tryImportPendingBeatsMarkDirtyAndUnlock(
+            QMutexLocker* pLock,
+            bool lockBpmAfterSet);
 
     void setCuePointsMarkDirtyAndUnlock(
             QMutexLocker* pLock,
@@ -405,13 +455,19 @@ class Track : public QObject {
     double getDuration(DurationRounding rounding) const;
 
     ExportTrackMetadataResult exportMetadata(
-            mixxx::MetadataSourcePointer pMetadataSource);
+            mixxx::MetadataSourcePointer pMetadataSource,
+            UserSettingsPointer pConfig);
 
     // Information about the actual properties of the
-    // audio stream is only available after opening it.
-    // On this occasion the audio properties of the track
-    // need to be updated to reflect these values.
-    void updateAudioPropertiesFromStream(
+    // audio stream is only available after opening the
+    // source at least once. On this occasion the metadata
+    // stream info of the track need to be updated to reflect
+    // these values.
+    bool hasStreamInfoFromSource() const {
+        QMutexLocker lock(&m_qMutex);
+        return m_record.hasStreamInfoFromSource();
+    }
+    void updateStreamInfoFromSource(
             mixxx::audio::StreamInfo&& streamInfo);
 
     // Mutex protecting access to object
@@ -432,11 +488,6 @@ class Track : public QObject {
     // the metadata.
     bool m_bMarkedForMetadataExport;
 
-    // Reliable information about the PCM audio stream
-    // that only becomes available when opening the
-    // corresponding file.
-    std::optional<mixxx::audio::StreamInfo> m_streamInfo;
-
     // The list of cue points for the track
     QList<CuePointer> m_cuePoints;
 
@@ -447,6 +498,7 @@ class Track : public QObject {
     ConstWaveformPointer m_waveform;
     ConstWaveformPointer m_waveformSummary;
 
+    mixxx::BeatsImporterPointer m_pBeatsImporterPending;
     mixxx::CueInfoImporterPointer m_pCueInfoImporterPending;
 
     friend class TrackDAO;

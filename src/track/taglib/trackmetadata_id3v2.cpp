@@ -46,12 +46,12 @@ bool checkHeaderVersionSupported(
 }
 
 // Preferred picture types for cover art sorted by priority
-const std::array<TagLib::ID3v2::AttachedPictureFrame::Type, 4> kPreferredPictureTypes = {
+const std::array<TagLib::ID3v2::AttachedPictureFrame::Type, 4> kPreferredPictureTypes{{
         TagLib::ID3v2::AttachedPictureFrame::FrontCover,   // Front cover image of the album
         TagLib::ID3v2::AttachedPictureFrame::Media,        // Image from the album itself
         TagLib::ID3v2::AttachedPictureFrame::Illustration, // Illustration related to the track
         TagLib::ID3v2::AttachedPictureFrame::Other,
-};
+}};
 
 // http://id3.org/id3v2.3.0
 // "TYER: The 'Year' frame is a numeric string with a year of the
@@ -73,6 +73,7 @@ const QString kFormatTDAT = QStringLiteral("ddMM");
 const QString kMusicBrainzOwner = QStringLiteral("http://musicbrainz.org");
 
 // Serato frames
+const QString kFrameDescriptionSeratoBeatGrid = QStringLiteral("Serato BeatGrid");
 const QString kFrameDescriptionSeratoMarkers = QStringLiteral("Serato Markers_");
 const QString kFrameDescriptionSeratoMarkers2 = QStringLiteral("Serato Markers2");
 
@@ -91,7 +92,7 @@ QString firstNonEmptyFrameToQString(
             if (!str.isEmpty()) {
                 return toQString(str);
             }
-            auto pUnknownFrame = dynamic_cast<const TagLib::ID3v2::UnknownFrame*>(pFrame);
+            const auto* pUnknownFrame = dynamic_cast<const TagLib::ID3v2::UnknownFrame*>(pFrame);
             if (pUnknownFrame) {
                 kLogger.warning()
                         << "Unsupported ID3v2 frame"
@@ -147,7 +148,7 @@ TagLib::ID3v2::CommentsFrame* findFirstCommentsFrame(
     for (TagLib::ID3v2::FrameList::ConstIterator it(commentsFrames.begin());
             it != commentsFrames.end();
             ++it) {
-        auto pFrame =
+        auto* pFrame =
                 dynamic_cast<TagLib::ID3v2::CommentsFrame*>(*it);
         if (pFrame) {
             const QString frameDescription(
@@ -190,7 +191,7 @@ TagLib::ID3v2::UserTextIdentificationFrame* findFirstUserTextIdentificationFrame
     for (TagLib::ID3v2::FrameList::ConstIterator it = textFrames.begin();
             it != textFrames.end();
             ++it) {
-        auto pFrame =
+        auto* pFrame =
                 dynamic_cast<TagLib::ID3v2::UserTextIdentificationFrame*>(*it);
         if (pFrame) {
             const QString frameDescription = toQString(pFrame->description());
@@ -291,7 +292,7 @@ TagLib::ID3v2::GeneralEncapsulatedObjectFrame* findFirstGeneralEncapsulatedObjec
     for (TagLib::ID3v2::FrameList::ConstIterator it(geobFrames.begin());
             it != geobFrames.end();
             ++it) {
-        auto pFrame =
+        auto* pFrame =
                 dynamic_cast<TagLib::ID3v2::GeneralEncapsulatedObjectFrame*>(*it);
         if (pFrame) {
             const QString frameDescription(
@@ -398,7 +399,7 @@ int removeUserTextIdentificationFrames(
         for (TagLib::ID3v2::FrameList::ConstIterator it(textFrames.begin());
                 it != textFrames.end();
                 ++it) {
-            auto pFrame =
+            auto* pFrame =
                     dynamic_cast<TagLib::ID3v2::UserTextIdentificationFrame*>(*it);
             if (pFrame) {
                 const QString frameDescription(
@@ -506,7 +507,6 @@ void writeUniqueFileIdentifierFrame(
 }
 #endif // __EXTRA_METADATA__
 
-#if defined(__EXPORT_SERATO_MARKERS__)
 void writeGeneralEncapsulatedObjectFrame(
         TagLib::ID3v2::Tag* pTag,
         const QString& description,
@@ -536,7 +536,6 @@ void writeGeneralEncapsulatedObjectFrame(
         }
     }
 }
-#endif // __EXPORT_SERATO_MARKERS__
 
 template<typename T>
 const T* downcastFrame(TagLib::ID3v2::Frame* frame) {
@@ -592,7 +591,7 @@ bool importCoverImageFromTag(
 
     const TagLib::ID3v2::FrameList pFrames = iterAPIC->second;
     for (const auto coverArtType : kPreferredPictureTypes) {
-        for (const auto pFrame : pFrames) {
+        for (auto* const pFrame : pFrames) {
             const auto* pApicFrame =
                     downcastFrame<TagLib::ID3v2::AttachedPictureFrame>(pFrame);
             if (pApicFrame && (pApicFrame->type() == coverArtType)) {
@@ -611,7 +610,7 @@ bool importCoverImageFromTag(
     }
 
     // Fallback: No best match -> Simply select the 1st loadable image
-    for (const auto pFrame : pFrames) {
+    for (auto* const pFrame : pFrames) {
         const auto* pApicFrame =
                 downcastFrame<TagLib::ID3v2::AttachedPictureFrame>(pFrame);
         if (pApicFrame) {
@@ -989,6 +988,13 @@ void importTrackMetadataFromTag(
 #endif // __EXTRA_METADATA__
 
     // Serato tags
+    const QByteArray seratoBeatGrid =
+            readFirstGeneralEncapsulatedObjectFrame(
+                    tag,
+                    kFrameDescriptionSeratoBeatGrid);
+    if (!seratoBeatGrid.isEmpty()) {
+        parseSeratoBeatGrid(pTrackMetadata, seratoBeatGrid, FileType::MP3);
+    }
     const QByteArray seratoMarkers =
             readFirstGeneralEncapsulatedObjectFrame(
                     tag,
@@ -1274,17 +1280,21 @@ bool exportTrackMetadataIntoTag(TagLib::ID3v2::Tag* pTag,
 
     // Export of Serato markers is disabled, because Mixxx
     // does not modify them.
-#if defined(__EXPORT_SERATO_MARKERS__)
     // Serato tags
-    writeGeneralEncapsulatedObjectFrame(
-            pTag,
-            kFrameDescriptionSeratoMarkers,
-            trackMetadata.getTrackInfo().getSeratoTags().dumpMarkers(FileType::MP3));
-    writeGeneralEncapsulatedObjectFrame(
-            pTag,
-            kFrameDescriptionSeratoMarkers2,
-            trackMetadata.getTrackInfo().getSeratoTags().dumpMarkers2(FileType::MP3));
-#endif // __EXPORT_SERATO_MARKERS__
+    if (trackMetadata.getTrackInfo().getSeratoTags().status() != SeratoTags::ParserStatus::Failed) {
+        writeGeneralEncapsulatedObjectFrame(
+                pTag,
+                kFrameDescriptionSeratoBeatGrid,
+                trackMetadata.getTrackInfo().getSeratoTags().dumpBeatGrid(FileType::MP3));
+        writeGeneralEncapsulatedObjectFrame(
+                pTag,
+                kFrameDescriptionSeratoMarkers,
+                trackMetadata.getTrackInfo().getSeratoTags().dumpMarkers(FileType::MP3));
+        writeGeneralEncapsulatedObjectFrame(
+                pTag,
+                kFrameDescriptionSeratoMarkers2,
+                trackMetadata.getTrackInfo().getSeratoTags().dumpMarkers2(FileType::MP3));
+    }
 
     return true;
 }

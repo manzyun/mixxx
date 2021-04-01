@@ -1,18 +1,21 @@
 #pragma once
 
+#include <gtest/gtest_prod.h>
+
 #include <QDir>
 #include <QList>
 #include <QSharedPointer>
 #include <QSqlDatabase>
 
-#include "preferences/usersettings.h"
-#include "library/crate/cratestorage.h"
-#include "library/dao/trackdao.h"
-#include "library/dao/cuedao.h"
-#include "library/dao/playlistdao.h"
 #include "library/dao/analysisdao.h"
+#include "library/dao/cuedao.h"
 #include "library/dao/directorydao.h"
 #include "library/dao/libraryhashdao.h"
+#include "library/dao/playlistdao.h"
+#include "library/dao/trackdao.h"
+#include "library/trackset/crate/cratestorage.h"
+#include "preferences/usersettings.h"
+#include "util/thread_affinity.h"
 
 // forward declaration(s)
 class BaseTrackCache;
@@ -29,30 +32,36 @@ class TrackCollection : public QObject,
     ~TrackCollection() override;
 
     void repairDatabase(
-            QSqlDatabase database) override;
+            const QSqlDatabase& database) override;
 
     void connectDatabase(
-            QSqlDatabase database) override;
+            const QSqlDatabase& database) override;
     void disconnectDatabase() override;
 
     QSqlDatabase database() const {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_database;
     }
 
     const CrateStorage& crates() const {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_crates;
     }
 
     TrackDAO& getTrackDAO() {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_trackDao;
     }
     PlaylistDAO& getPlaylistDAO() {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_playlistDao;
     }
     DirectoryDAO& getDirectoryDAO() {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_directoryDao;
     }
     AnalysisDao& getAnalysisDAO() {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_analysisDao;
     }
 
@@ -60,6 +69,7 @@ class TrackCollection : public QObject,
     QWeakPointer<BaseTrackCache> disconnectTrackSource();
 
     QSharedPointer<BaseTrackCache> getTrackSource() const {
+        DEBUG_ASSERT_QOBJECT_THREAD_AFFINITY(this);
         return m_pTrackSource;
     }
 
@@ -90,14 +100,6 @@ class TrackCollection : public QObject,
     TrackId getTrackIdByRef(
             const TrackRef& trackRef) const;
 
-    // Only public for tests
-    TrackPointer getOrAddTrack(
-            const TrackRef& trackRef,
-            bool* pAlreadyInLibrary = nullptr);
-    TrackId addTrack(
-            const TrackPointer& pTrack,
-            bool unremove);
-
   signals:
     // Forwarded signals from LibraryScanner
     void scanTrackAdded(TrackPointer pTrack);
@@ -105,9 +107,9 @@ class TrackCollection : public QObject,
     // Forwarded signals from TrackDAO
     void trackClean(TrackId trackId);
     void trackDirty(TrackId trackId);
-    void tracksAdded(QSet<TrackId> trackIds);
-    void tracksChanged(QSet<TrackId> trackIds);
-    void tracksRemoved(QSet<TrackId> trackIds);
+    void tracksAdded(const QSet<TrackId>& trackIds);
+    void tracksChanged(const QSet<TrackId>& trackIds);
+    void tracksRemoved(const QSet<TrackId>& trackIds);
     void multipleTracksChanged();
 
     void crateInserted(CrateId id);
@@ -126,9 +128,18 @@ class TrackCollection : public QObject,
     friend class Upgrade;
 
     // No parent during database schema upgrade
-    TrackCollection(const UserSettingsPointer& pConfig)
+    explicit TrackCollection(const UserSettingsPointer& pConfig)
             : TrackCollection(nullptr, pConfig) {
     }
+
+    TrackPointer getOrAddTrack(
+            const TrackRef& trackRef,
+            bool* pAlreadyInLibrary = nullptr);
+    FRIEND_TEST(DirectoryDAOTest, relocateDirectory);
+    FRIEND_TEST(TrackDAOTest, detectMovedTracks);
+    TrackId addTrack(
+            const TrackPointer& pTrack,
+            bool unremove);
 
     bool hideTracks(const QList<TrackId>& trackIds);
     bool unhideTracks(const QList<TrackId>& trackIds);
@@ -139,7 +150,7 @@ class TrackCollection : public QObject,
 
     bool addDirectory(const QString& dir);
     bool removeDirectory(const QString& dir);
-    void relocateDirectory(QString oldDir, QString newDir);
+    void relocateDirectory(const QString& oldDir, const QString& newDir);
 
     void saveTrack(Track* pTrack);
 

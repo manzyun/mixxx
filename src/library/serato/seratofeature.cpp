@@ -1,6 +1,3 @@
-// seratofeature.cpp
-// Created 2020-01-31 by Jan Holthuis
-
 #include "library/serato/seratofeature.h"
 
 #include <QMap>
@@ -9,15 +6,13 @@
 #include <QStandardPaths>
 #include <QtDebug>
 
-#include "engine/engine.h"
 #include "library/dao/trackschema.h"
 #include "library/library.h"
-#include "library/librarytablemodel.h"
-#include "library/missingtablemodel.h"
 #include "library/queryutil.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "library/treeitem.h"
+#include "moc_seratofeature.cpp"
 #include "track/beatfactory.h"
 #include "track/cue.h"
 #include "track/keyfactory.h"
@@ -25,9 +20,6 @@
 #include "util/color/color.h"
 #include "util/db/dbconnectionpooled.h"
 #include "util/db/dbconnectionpooler.h"
-#include "util/file.h"
-#include "util/sandbox.h"
-#include "waveform/waveform.h"
 #include "widget/wlibrary.h"
 #include "widget/wlibrarytextbrowser.h"
 
@@ -151,12 +143,7 @@ inline quint32 bytesToUInt32(const QByteArray& data) {
     VERIFY_OR_DEBUG_ASSERT(data.size() >= static_cast<int>(sizeof(quint32))) {
         return 0;
     }
-#if QT_VERSION >= QT_VERSION_CHECK(5, 12, 0)
     return qFromBigEndian<quint32>(data.constData());
-#else
-    return qFromBigEndian<quint32>(
-            reinterpret_cast<const uchar*>(data.constData()));
-#endif
 }
 
 inline bool parseTrack(serato_track_t* track, QIODevice* buffer) {
@@ -361,7 +348,7 @@ QString parseCrate(
     }
 
     QFile crateFile(crateFilePath);
-    if (!crateFile.open(QIODevice::ReadOnly)) {
+    if (!Sandbox::askForAccess(crateFilePath) || !crateFile.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open file "
                    << crateFilePath
                    << " for reading.";
@@ -515,7 +502,7 @@ QString parseDatabase(mixxx::DbConnectionPoolPtr dbConnectionPool, TreeItem* dat
             LIBRARYTABLE_SAMPLERATE + ", " +
             LIBRARYTABLE_BPM + ", " +
             LIBRARYTABLE_KEY + ", " +
-            LIBRARYTABLE_LOCATION + ", " +
+            TRACKLOCATIONSTABLE_LOCATION + ", " +
             LIBRARYTABLE_BPM_LOCK + ", " +
             LIBRARYTABLE_DATETIMEADDED +
             ", "
@@ -542,7 +529,7 @@ QString parseDatabase(mixxx::DbConnectionPoolPtr dbConnectionPool, TreeItem* dat
             ")");
 
     QFile databaseFile(databaseFilePath);
-    if (!databaseFile.open(QIODevice::ReadOnly)) {
+    if (!Sandbox::askForAccess(databaseFilePath) || !databaseFile.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open file "
                    << databaseFilePath
                    << " for reading.";
@@ -838,7 +825,7 @@ bool createPlaylistTracksTable(QSqlDatabase& database, const QString& tableName)
     return true;
 }
 
-bool dropTable(QSqlDatabase& database, QString tableName) {
+bool dropTable(QSqlDatabase& database, const QString& tableName) {
     qDebug() << "Dropping Serato table: " << tableName;
 
     QSqlQuery query(database);
@@ -874,7 +861,7 @@ SeratoFeature::SeratoFeature(
             << LIBRARYTABLE_BPM
             << LIBRARYTABLE_KEY
             << LIBRARYTABLE_TRACKNUMBER
-            << LIBRARYTABLE_LOCATION
+            << TRACKLOCATIONSTABLE_LOCATION
             << LIBRARYTABLE_BPM_LOCK;
 
     QStringList searchColumns;
@@ -885,7 +872,7 @@ SeratoFeature::SeratoFeature(
             << LIBRARYTABLE_YEAR
             << LIBRARYTABLE_GENRE
             << LIBRARYTABLE_TRACKNUMBER
-            << LIBRARYTABLE_LOCATION
+            << TRACKLOCATIONSTABLE_LOCATION
             << LIBRARYTABLE_COMMENT
             << LIBRARYTABLE_DURATION
             << LIBRARYTABLE_BITRATE
@@ -946,7 +933,7 @@ void SeratoFeature::bindLibraryWidget(WLibrary* libraryWidget,
     WLibraryTextBrowser* edit = new WLibraryTextBrowser(libraryWidget);
     edit->setHtml(formatRootViewHtml());
     edit->setOpenLinks(false);
-    connect(edit, SIGNAL(anchorClicked(const QUrl)), this, SLOT(htmlLinkClicked(const QUrl)));
+    connect(edit, &WLibraryTextBrowser::anchorClicked, this, &SeratoFeature::htmlLinkClicked);
     libraryWidget->registerView("SERATOHOME", edit);
 }
 
@@ -958,7 +945,7 @@ void SeratoFeature::htmlLinkClicked(const QUrl& link) {
     }
 }
 
-BaseSqlTableModel* SeratoFeature::getPlaylistModelForPlaylist(QString playlist) {
+BaseSqlTableModel* SeratoFeature::getPlaylistModelForPlaylist(const QString& playlist) {
     SeratoPlaylistModel* model = new SeratoPlaylistModel(this, m_pLibrary->trackCollections(), m_trackSource);
     model->setPlaylist(playlist);
     return model;
@@ -993,7 +980,7 @@ QString SeratoFeature::formatRootViewHtml() const {
     html.append(QString("<h2>%1</h2>").arg(title));
     html.append(QString("<p>%1</p>").arg(summary));
     html.append(QString("<ul>"));
-    for (const auto& item : items) {
+    for (const auto& item : qAsConst(items)) {
         html.append(QString("<li>%1</li>").arg(item));
     }
     html.append(QString("</ul>"));
@@ -1024,8 +1011,9 @@ void SeratoFeature::activate() {
 }
 
 void SeratoFeature::activateChild(const QModelIndex& index) {
-    if (!index.isValid())
+    if (!index.isValid()) {
         return;
+    }
 
     //access underlying TreeItem object
     TreeItem* item = static_cast<TreeItem*>(index.internalPointer());

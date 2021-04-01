@@ -7,6 +7,8 @@
 #include "engine/controls/bpmcontrol.h"
 #include "engine/controls/ratecontrol.h"
 #include "engine/enginebuffer.h"
+#include "moc_synccontrol.cpp"
+#include "track/track.h"
 #include "util/assert.h"
 #include "util/logger.h"
 #include "util/math.h"
@@ -129,12 +131,12 @@ void SyncControl::setSyncMode(SyncMode mode) {
     m_pSyncEnabled->setAndConfirm(mode != SYNC_NONE);
     m_pSyncMasterEnabled->setAndConfirm(isMaster(mode));
     if (mode == SYNC_FOLLOWER) {
-        if (m_pVCEnabled && m_pVCEnabled->get()) {
+        if (m_pVCEnabled && m_pVCEnabled->toBool()) {
             // If follower mode is enabled, disable vinyl control.
             m_pVCEnabled->set(0.0);
         }
     }
-    if (mode != SYNC_NONE && m_pPassthroughEnabled->get()) {
+    if (mode != SYNC_NONE && m_pPassthroughEnabled->toBool()) {
         // If any sync mode is enabled and passthrough was on somehow, disable passthrough.
         // This is very unlikely to happen so this deserves a warning.
         qWarning() << "Notified of sync mode change when passthrough was "
@@ -304,7 +306,7 @@ void SyncControl::updateTargetBeatDistance() {
 
 double SyncControl::getBpm() const {
     if (kLogger.traceEnabled()) {
-        kLogger.trace() << getGroup() << "SyncControl::getBpm()" << m_pBpm->get();
+        kLogger.trace() << getGroup() << "SyncControl::getBpm()";
     }
     return m_pBpm->get() / m_masterBpmAdjustFactor;
 }
@@ -358,18 +360,21 @@ void SyncControl::trackBeatsUpdated(mixxx::BeatsPointer pBeats) {
 }
 
 void SyncControl::slotControlPlay(double play) {
+    if (kLogger.traceEnabled()) {
+        kLogger.trace() << "SyncControl::slotControlPlay" << getSyncMode() << play;
+    }
     m_pEngineSync->notifyPlaying(this, play > 0.0);
 }
 
 void SyncControl::slotVinylControlChanged(double enabled) {
-    if (enabled && getSyncMode() == SYNC_FOLLOWER) {
+    if (enabled != 0 && getSyncMode() == SYNC_FOLLOWER) {
         // If vinyl control was enabled and we're a follower, disable sync mode.
         m_pChannel->getEngineBuffer()->requestSyncMode(SYNC_NONE);
     }
 }
 
 void SyncControl::slotPassthroughChanged(double enabled) {
-    if (enabled && isSynchronized()) {
+    if (enabled != 0 && isSynchronized()) {
         // If passthrough was enabled and sync was on, disable it.
         m_pChannel->getEngineBuffer()->requestSyncMode(SYNC_NONE);
     }
@@ -388,7 +393,7 @@ void SyncControl::slotSyncModeChangeRequest(double state) {
         kLogger.trace() << getGroup() << "SyncControl::slotSyncModeChangeRequest";
     }
     SyncMode mode = syncModeFromDouble(state);
-    if (m_pPassthroughEnabled->get() && mode != SYNC_NONE) {
+    if (m_pPassthroughEnabled->toBool() && mode != SYNC_NONE) {
         qDebug() << "Disallowing enabling of sync mode when passthrough active";
     } else {
         m_pChannel->getEngineBuffer()->requestSyncMode(mode);
@@ -396,28 +401,44 @@ void SyncControl::slotSyncModeChangeRequest(double state) {
 }
 
 void SyncControl::slotSyncMasterEnabledChangeRequest(double state) {
+    if (kLogger.traceEnabled()) {
+        kLogger.trace() << "SyncControl::slotSyncMasterEnabledChangeRequest" << getGroup();
+    }
+    SyncMode mode = getSyncMode();
     if (state > 0.0) {
-        if (isMaster(getSyncMode())) {
+        if (mode == SYNC_MASTER_EXPLICIT) {
             // Already master.
             return;
         }
-        if (m_pPassthroughEnabled->get()) {
+        if (mode == SYNC_MASTER_SOFT) {
+            // user request: make master explicit
+            m_pSyncMode->setAndConfirm(SYNC_MASTER_EXPLICIT);
+            return;
+        }
+        if (m_pPassthroughEnabled->toBool()) {
             qDebug() << "Disallowing enabling of sync mode when passthrough active";
             return;
         }
+        m_pChannel->getEngineBuffer()->requestSyncMode(SYNC_MASTER_EXPLICIT);
+    } else {
+        // Turning off master goes back to follower mode.
+        if (mode == SYNC_FOLLOWER) {
+            // Already not master.
+            return;
+        }
+        m_pChannel->getEngineBuffer()->requestSyncMode(SYNC_FOLLOWER);
     }
-    // TODO(owilliams): Because SYNC_MASTER_EXPLICIT has issues, for now we
-    // actually just enable follower mode even when they ask for master. This
-    // is equivalent to the behavior in 2.2
-    m_pChannel->getEngineBuffer()->requestSyncMode(SYNC_FOLLOWER);
 }
 
 void SyncControl::slotSyncEnabledChangeRequest(double enabled) {
+    if (kLogger.traceEnabled()) {
+        kLogger.trace() << "SyncControl::slotSyncEnabledChangeRequest" << getGroup();
+    }
     bool bEnabled = enabled > 0.0;
 
     // Allow a request for state change even if it's the same as the current
     // state.  We might have toggled on and off in the space of one buffer.
-    if (bEnabled && m_pPassthroughEnabled->get()) {
+    if (bEnabled && m_pPassthroughEnabled->toBool()) {
         qDebug() << "Disallowing enabling of sync mode when passthrough active";
         return;
     }
@@ -437,7 +458,7 @@ void SyncControl::setLocalBpm(double local_bpm) {
 
     double bpm = local_bpm * m_pRateRatio->get();
 
-    if (syncMode == SYNC_FOLLOWER) {
+    if (isFollower(syncMode)) {
         // In this case we need an update from the current master to adjust
         // the rate that we continue with the master BPM. If there is no
         // master bpm, our bpm value is adopted and the m_masterBpmAdjustFactor
@@ -447,7 +468,7 @@ void SyncControl::setLocalBpm(double local_bpm) {
         DEBUG_ASSERT(isMaster(syncMode));
         // We might have adopted an adjust factor when becoming master.
         // Keep it when reporting our bpm.
-        m_pEngineSync->notifyBpmChanged(this, bpm / m_masterBpmAdjustFactor);
+        m_pEngineSync->notifyBaseBpmChanged(this, bpm / m_masterBpmAdjustFactor);
     }
 }
 
@@ -459,7 +480,7 @@ void SyncControl::slotRateChanged() {
     if (bpm > 0 && isSynchronized()) {
         // When reporting our bpm, remove the multiplier so the masters all
         // think the followers have the same bpm.
-        m_pEngineSync->notifyBpmChanged(this, bpm / m_masterBpmAdjustFactor);
+        m_pEngineSync->notifyBaseBpmChanged(this, bpm / m_masterBpmAdjustFactor);
     }
 }
 

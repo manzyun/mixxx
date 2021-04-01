@@ -18,13 +18,11 @@ class MockPortMidiController : public PortMidiController {
     MockPortMidiController(const PmDeviceInfo* inputDeviceInfo,
             const PmDeviceInfo* outputDeviceInfo,
             int inputDeviceIndex,
-            int outputDeviceIndex,
-            UserSettingsPointer pConfig)
+            int outputDeviceIndex)
             : PortMidiController(inputDeviceInfo,
                       outputDeviceInfo,
                       inputDeviceIndex,
-                      outputDeviceIndex,
-                      pConfig) {
+                      outputDeviceIndex) {
     }
     ~MockPortMidiController() override {
     }
@@ -33,13 +31,17 @@ class MockPortMidiController : public PortMidiController {
         PortMidiController::sendShortMsg(status, byte1, byte2);
     }
 
-    void sendSysexMsg(QList<int> data, unsigned int length) {
+    void sendSysexMsg(const QList<int>& data, unsigned int length) {
         PortMidiController::sendSysexMsg(data, length);
     }
 
-    MOCK_METHOD4(receive, void(unsigned char, unsigned char, unsigned char,
-                               mixxx::Duration));
-    MOCK_METHOD2(receive, void(const QByteArray, mixxx::Duration));
+    MOCK_METHOD4(receivedShortMessage,
+            void(unsigned char, unsigned char, unsigned char, mixxx::Duration));
+    MOCK_METHOD2(receive, void(const QByteArray&, mixxx::Duration));
+
+    // These tests are unrelated to scripting.
+    MOCK_METHOD0(startEngine, void());
+    MOCK_METHOD0(stopEngine, void());
 };
 
 class MockPortMidiDevice : public PortMidiDevice {
@@ -76,7 +78,7 @@ class PortMidiControllerTest : public MixxxTest {
         m_outputDeviceInfo.opened = 0;
 
         m_pController.reset(new MockPortMidiController(
-                &m_inputDeviceInfo, &m_outputDeviceInfo, 0, 0, config()));
+                &m_inputDeviceInfo, &m_outputDeviceInfo, 0, 0));
         m_pController->setPortMidiInputDevice(m_mockInput);
         m_pController->setPortMidiOutputDevice(m_mockOutput);
     }
@@ -196,23 +198,6 @@ TEST_F(PortMidiControllerTest, WriteSysex_Malformed) {
     m_pController->sendSysexMsg(sysex, sysex.length());
 };
 
-TEST_F(PortMidiControllerTest, Poll_Read_NoInput) {
-    Sequence poll;
-    EXPECT_CALL(*m_mockInput, isOpen())
-            .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(poll)
-            .WillOnce(Return((PmError)FALSE));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(poll)
-            .WillOnce(Return((PmError)TRUE));
-    EXPECT_CALL(*m_mockInput, read(_, _))
-            .InSequence(poll)
-            .WillOnce(Return(0));
-
-    pollDevice();
-    pollDevice();
-};
 
 TEST_F(PortMidiControllerTest, Poll_Read_Basic) {
     std::vector<PmEvent> messages;
@@ -222,17 +207,14 @@ TEST_F(PortMidiControllerTest, Poll_Read_Basic) {
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages.begin(), messages.end()),
                             Return(messages.size())));
 
-    EXPECT_CALL(*m_pController, receive(0x90, 0x3C, 0x40, _))
+    EXPECT_CALL(*m_pController, receivedShortMessage(0x90, 0x3C, 0x40, _))
             .InSequence(read);
-    EXPECT_CALL(*m_pController, receive(0x80, 0x3C, 0x40, _))
+    EXPECT_CALL(*m_pController, receivedShortMessage(0x80, 0x3C, 0x40, _))
             .InSequence(read);
 
     pollDevice();
@@ -247,29 +229,26 @@ TEST_F(PortMidiControllerTest, Poll_Read_SysExWithRealtime) {
     messages.push_back(MakeEvent(0x000000F7, 0x0));
 
     QByteArray sysex;
-    sysex.append(0xF0);
-    sysex.append(0x11);
-    sysex.append(0x22);
-    sysex.append(0x33);
-    sysex.append(0x44);
-    sysex.append(0x55);
-    sysex.append(0x66);
-    sysex.append(0x77);
-    sysex.append(0xF7);
+    sysex.append('\xF0');
+    sysex.append('\x11');
+    sysex.append('\x22');
+    sysex.append('\x33');
+    sysex.append('\x44');
+    sysex.append('\x55');
+    sysex.append('\x66');
+    sysex.append('\x77');
+    sysex.append('\xF7');
 
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages.begin(), messages.end()),
                             Return(messages.size())));
-    EXPECT_CALL(*m_pController, receive(0xF8, 0x00, 0x00, _))
+    EXPECT_CALL(*m_pController, receivedShortMessage(0xF8, 0x00, 0x00, _))
             .InSequence(read);
-    EXPECT_CALL(*m_pController, receive(0xFA, 0x00, 0x00, _))
+    EXPECT_CALL(*m_pController, receivedShortMessage(0xFA, 0x00, 0x00, _))
             .InSequence(read);
     EXPECT_CALL(*m_pController, receive(sysex, _))
             .InSequence(read);
@@ -283,21 +262,18 @@ TEST_F(PortMidiControllerTest, Poll_Read_SysEx) {
     messages.push_back(MakeEvent(0xF7665544, 0x1));
 
     QByteArray sysex;
-    sysex.append(0xF0);
-    sysex.append(0x11);
-    sysex.append(0x22);
-    sysex.append(0x33);
-    sysex.append(0x44);
-    sysex.append(0x55);
-    sysex.append(0x66);
-    sysex.append(0xF7);
+    sysex.append('\xF0');
+    sysex.append('\x11');
+    sysex.append('\x22');
+    sysex.append('\x33');
+    sysex.append('\x44');
+    sysex.append('\x55');
+    sysex.append('\x66');
+    sysex.append('\xF7');
 
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages.begin(), messages.end()),
@@ -318,23 +294,20 @@ TEST_F(PortMidiControllerTest,
     messages.push_back(MakeEvent(0x0000F777, 0x0));
 
     QByteArray sysex;
-    sysex.append(0xF0);
-    sysex.append(0x11);
-    sysex.append(0x22);
-    sysex.append(0x33);
-    sysex.append(0x44);
-    sysex.append(0xF8);
-    sysex.append(0x55);
-    sysex.append(0x66);
-    sysex.append(0x77);
-    sysex.append(0xF7);
+    sysex.append('\xF0');
+    sysex.append('\x11');
+    sysex.append('\x22');
+    sysex.append('\x33');
+    sysex.append('\x44');
+    sysex.append('\xF8');
+    sysex.append('\x55');
+    sysex.append('\x66');
+    sysex.append('\x77');
+    sysex.append('\xF7');
 
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages.begin(), messages.end()),
@@ -358,14 +331,11 @@ TEST_F(PortMidiControllerTest, Poll_Read_SysExInterrupted_FollowedByNormalMessag
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages.begin(), messages.end()),
                             Return(messages.size())));
-    EXPECT_CALL(*m_pController, receive(0x90, 0x3C, 0x40, _))
+    EXPECT_CALL(*m_pController, receivedShortMessage(0x90, 0x3C, 0x40, _))
             .InSequence(read);
 
     pollDevice();
@@ -384,21 +354,18 @@ TEST_F(PortMidiControllerTest, Poll_Read_SysExInterrupted_FollowedBySysExMessage
     messages.push_back(MakeEvent(0xF7665544, 0x0));
 
     QByteArray sysex;
-    sysex.append(0xF0);
-    sysex.append(0x11);
-    sysex.append(0x22);
-    sysex.append(0x33);
-    sysex.append(0x44);
-    sysex.append(0x55);
-    sysex.append(0x66);
-    sysex.append(0xF7);
+    sysex.append('\xF0');
+    sysex.append('\x11');
+    sysex.append('\x22');
+    sysex.append('\x33');
+    sysex.append('\x44');
+    sysex.append('\x55');
+    sysex.append('\x66');
+    sysex.append('\xF7');
 
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages.begin(), messages.end()),
@@ -427,49 +394,37 @@ TEST_F(PortMidiControllerTest, Poll_Read_SysEx_BufferOverflow) {
     messages3.push_back(MakeEvent(0xF7665544, 0x2));
 
     QByteArray sysex;
-    sysex.append(0xF0);
-    sysex.append(0x11);
-    sysex.append(0x22);
-    sysex.append(0x33);
-    sysex.append(0x44);
-    sysex.append(0x55);
-    sysex.append(0x66);
-    sysex.append(0xF7);
+    sysex.append('\xF0');
+    sysex.append('\x11');
+    sysex.append('\x22');
+    sysex.append('\x33');
+    sysex.append('\x44');
+    sysex.append('\x55');
+    sysex.append('\x66');
+    sysex.append('\xF7');
 
     Sequence read;
     EXPECT_CALL(*m_mockInput, isOpen())
             .WillRepeatedly(Return(true));
 
     // Poll 1 -- returns messages1.
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages1.begin(), messages1.end()),
                             Return(messages1.size())));
 
     // Poll 2 -- buffer overflow.
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(Return(pmBufferOverflow));
 
     // Poll 3 -- returns messages2.
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages2.begin(), messages2.end()),
                             Return(messages2.size())));
 
     // Poll 4 -- returns messages3.
-    EXPECT_CALL(*m_mockInput, poll())
-            .InSequence(read)
-            .WillOnce(Return((PmError)TRUE));
     EXPECT_CALL(*m_mockInput, read(NotNull(), _))
             .InSequence(read)
             .WillOnce(DoAll(SetArrayArgument<0>(messages3.begin(), messages3.end()),

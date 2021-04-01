@@ -1,5 +1,4 @@
-#ifndef SYNCCONTROL_H
-#define SYNCCONTROL_H
+#pragma once
 
 #include <QScopedPointer>
 #include <gtest/gtest_prod.h>
@@ -39,6 +38,9 @@ class SyncControl : public EngineControl, public Syncable {
     double getBeatDistance() const override;
     void updateTargetBeatDistance();
     double getBaseBpm() const override;
+
+    // The local bpm is the base bpm of the track around the current position.
+    // For beatmap tracks, this can change with every beat.
     void setLocalBpm(double local_bpm);
 
     // Must never result in a call to
@@ -135,6 +137,3 @@ class SyncControl : public EngineControl, public Syncable {
     // m_pBeats is written from an engine worker thread
     mixxx::BeatsPointer m_pBeats;
 };
-
-
-#endif /* SYNCCONTROL_H */

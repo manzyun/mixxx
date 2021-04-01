@@ -1,41 +1,31 @@
-/***************************************************************************
-                          enginesync.cpp  -  master sync control for
-                          maintaining beatmatching amongst n decks
-                             -------------------
-    begin                : Mon Mar 12 2012
-    copyright            : (C) 2012 by Owen Williams
-    email                : owilliams@mixxx.org
-***************************************************************************/
-
-/***************************************************************************
-*                                                                         *
-*   This program is free software; you can redistribute it and/or modify  *
-*   it under the terms of the GNU General Public License as published by  *
-*   the Free Software Foundation; either version 2 of the License, or     *
-*   (at your option) any later version.                                   *
-*                                                                         *
-***************************************************************************/
-
 #include "engine/sync/enginesync.h"
 
+#include <QMetaType>
 #include <QStringList>
 
 #include "engine/channels/enginechannel.h"
 #include "engine/enginebuffer.h"
 #include "engine/sync/internalclock.h"
 #include "util/assert.h"
-#include "util/defs.h"
 #include "util/logger.h"
 
 namespace {
 const mixxx::Logger kLogger("EngineSync");
-} // namespace
+const QString kInternalClockGroup = QStringLiteral("[InternalClock]");
+} // anonymous namespace
 
 EngineSync::EngineSync(UserSettingsPointer pConfig)
-        : BaseSyncableListener(pConfig) {
+        : m_pConfig(pConfig),
+          m_pInternalClock(new InternalClock(kInternalClockGroup, this)),
+          m_pMasterSyncable(nullptr) {
+    qRegisterMetaType<SyncMode>("SyncMode");
+    m_pInternalClock->setMasterBpm(124.0);
 }
 
 EngineSync::~EngineSync() {
+    // We use the slider value because that is never set to 0.0.
+    m_pConfig->set(ConfigKey(kInternalClockGroup, "bpm"), ConfigValue(m_pInternalClock->getBpm()));
+    delete m_pInternalClock;
 }
 
 Syncable* EngineSync::pickMaster(Syncable* enabling_syncable) {
@@ -49,7 +39,7 @@ Syncable* EngineSync::pickMaster(Syncable* enabling_syncable) {
     int stopped_deck_count = 0;
     int playing_deck_count = 0;
 
-    for (const auto& pSyncable : m_syncables) {
+    for (const auto& pSyncable : qAsConst(m_syncables)) {
         if (pSyncable->getBaseBpm() <= 0.0) {
             continue;
         }
@@ -107,8 +97,10 @@ void EngineSync::requestSyncMode(Syncable* pSyncable, SyncMode mode) {
         // tempo, the tempo of the old master remains until we know better
         activateMaster(pSyncable, true);
         if (pSyncable->getBaseBpm() > 0) {
-            setMasterParams(pSyncable, pSyncable->getBeatDistance(),
-                            pSyncable->getBaseBpm(), pSyncable->getBpm());
+            setMasterParams(pSyncable,
+                    pSyncable->getBeatDistance(),
+                    pSyncable->getBaseBpm(),
+                    pSyncable->getBpm());
         }
     } else if (mode == SYNC_FOLLOWER ||
             mode == SYNC_MASTER_SOFT ||
@@ -271,7 +263,10 @@ void EngineSync::notifyPlaying(Syncable* pSyncable, bool playing) {
 
     if (newMaster != nullptr && newMaster != m_pMasterSyncable) {
         activateMaster(newMaster, false);
-        setMasterParams(newMaster, newMaster->getBeatDistance(), newMaster->getBaseBpm(), newMaster->getBpm());
+        setMasterParams(newMaster,
+                newMaster->getBeatDistance(),
+                newMaster->getBaseBpm(),
+                newMaster->getBpm());
     }
 
     pSyncable->requestSync();
@@ -283,9 +278,9 @@ void EngineSync::notifyScratching(Syncable* pSyncable, bool scratching) {
     Q_UNUSED(scratching);
 }
 
-void EngineSync::notifyBpmChanged(Syncable* pSyncable, double bpm) {
+void EngineSync::notifyBaseBpmChanged(Syncable* pSyncable, double bpm) {
     if (kLogger.traceEnabled()) {
-        kLogger.trace() << "EngineSync::notifyBpmChanged" << pSyncable->getGroup() << bpm;
+        kLogger.trace() << "EngineSync::notifyBaseBpmChanged" << pSyncable->getGroup() << bpm;
     }
 
     // Master Base BPM shouldn't be updated for every random deck that twiddles
@@ -329,15 +324,16 @@ void EngineSync::notifyInstantaneousBpmChanged(Syncable* pSyncable, double bpm) 
     setMasterInstantaneousBpm(pSyncable, bpm);
 }
 
-void EngineSync::notifyBeatDistanceChanged(Syncable* pSyncable, double beat_distance) {
+void EngineSync::notifyBeatDistanceChanged(Syncable* pSyncable, double beatDistance) {
     if (kLogger.traceEnabled()) {
-        kLogger.trace() << "EngineSync::notifyBeatDistanceChanged" << pSyncable->getGroup() << beat_distance;
+        kLogger.trace() << "EngineSync::notifyBeatDistanceChanged"
+                        << pSyncable->getGroup() << beatDistance;
     }
     if (!isMaster(pSyncable->getSyncMode())) {
         return;
     }
 
-    setMasterBeatDistance(pSyncable, beat_distance);
+    setMasterBeatDistance(pSyncable, beatDistance);
 }
 
 void EngineSync::activateFollower(Syncable* pSyncable) {
@@ -399,7 +395,7 @@ void EngineSync::activateMaster(Syncable* pSyncable, bool explicitMaster) {
         activateFollower(m_pInternalClock);
     }
 
-    // It is up to callers of this function to initialize bpm and beat_distance
+    // It is up to callers of this function to initialize bpm and beatDistance
     // if necessary.
 }
 
@@ -477,7 +473,7 @@ Syncable* EngineSync::pickNonSyncSyncTarget(EngineChannel* pDontPick) const {
 
 bool EngineSync::otherSyncedPlaying(const QString& group) {
     bool othersInSync = false;
-    for (Syncable* theSyncable : m_syncables) {
+    for (Syncable* theSyncable : qAsConst(m_syncables)) {
         bool isSynchonized = theSyncable->isSynchronized();
         if (theSyncable->getGroup() == group) {
             if (!isSynchonized) {
@@ -490,4 +486,139 @@ bool EngineSync::otherSyncedPlaying(const QString& group) {
         }
     }
     return othersInSync;
+}
+
+void EngineSync::addSyncableDeck(Syncable* pSyncable) {
+    if (m_syncables.contains(pSyncable)) {
+        qDebug() << "EngineSync: already has" << pSyncable;
+        return;
+    }
+    m_syncables.append(pSyncable);
+}
+
+void EngineSync::onCallbackStart(int sampleRate, int bufferSize) {
+    m_pInternalClock->onCallbackStart(sampleRate, bufferSize);
+}
+
+void EngineSync::onCallbackEnd(int sampleRate, int bufferSize) {
+    m_pInternalClock->onCallbackEnd(sampleRate, bufferSize);
+}
+
+EngineChannel* EngineSync::getMaster() const {
+    return m_pMasterSyncable ? m_pMasterSyncable->getChannel() : nullptr;
+}
+
+Syncable* EngineSync::getSyncableForGroup(const QString& group) {
+    foreach (Syncable* pSyncable, m_syncables) {
+        if (pSyncable->getGroup() == group) {
+            return pSyncable;
+        }
+    }
+    return nullptr;
+}
+
+bool EngineSync::syncDeckExists() const {
+    for (const auto& pSyncable : qAsConst(m_syncables)) {
+        if (pSyncable->isSynchronized() && pSyncable->getBaseBpm() > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+double EngineSync::masterBpm() const {
+    if (m_pMasterSyncable) {
+        return m_pMasterSyncable->getBpm();
+    }
+    return m_pInternalClock->getBpm();
+}
+
+double EngineSync::masterBeatDistance() const {
+    if (m_pMasterSyncable) {
+        return m_pMasterSyncable->getBeatDistance();
+    }
+    return m_pInternalClock->getBeatDistance();
+}
+
+double EngineSync::masterBaseBpm() const {
+    if (m_pMasterSyncable) {
+        return m_pMasterSyncable->getBaseBpm();
+    }
+    return m_pInternalClock->getBaseBpm();
+}
+
+void EngineSync::setMasterBpm(Syncable* pSource, double bpm) {
+    //qDebug() << "EngineSync::setMasterBpm" << pSource << bpm;
+    if (pSource != m_pInternalClock) {
+        m_pInternalClock->setMasterBpm(bpm);
+    }
+    foreach (Syncable* pSyncable, m_syncables) {
+        if (pSyncable == pSource ||
+                !pSyncable->isSynchronized()) {
+            continue;
+        }
+        pSyncable->setMasterBpm(bpm);
+    }
+}
+
+void EngineSync::setMasterInstantaneousBpm(Syncable* pSource, double bpm) {
+    if (pSource != m_pInternalClock) {
+        m_pInternalClock->setInstantaneousBpm(bpm);
+    }
+    foreach (Syncable* pSyncable, m_syncables) {
+        if (pSyncable == pSource ||
+                !pSyncable->isSynchronized()) {
+            continue;
+        }
+        pSyncable->setInstantaneousBpm(bpm);
+    }
+}
+
+void EngineSync::setMasterBeatDistance(Syncable* pSource, double beatDistance) {
+    if (pSource != m_pInternalClock) {
+        m_pInternalClock->setMasterBeatDistance(beatDistance);
+    }
+    foreach (Syncable* pSyncable, m_syncables) {
+        if (pSyncable == pSource ||
+                !pSyncable->isSynchronized()) {
+            continue;
+        }
+        pSyncable->setMasterBeatDistance(beatDistance);
+    }
+}
+
+void EngineSync::setMasterParams(
+        Syncable* pSource, double beatDistance, double baseBpm, double bpm) {
+    //qDebug() << "EngineSync::setMasterParams, source is" << pSource->getGroup() << beatDistance << baseBpm << bpm;
+    if (pSource != m_pInternalClock) {
+        m_pInternalClock->setMasterParams(beatDistance, baseBpm, bpm);
+    }
+    foreach (Syncable* pSyncable, m_syncables) {
+        if (pSyncable == pSource ||
+                !pSyncable->isSynchronized()) {
+            continue;
+        }
+        pSyncable->setMasterParams(beatDistance, baseBpm, bpm);
+    }
+}
+
+void EngineSync::checkUniquePlayingSyncable() {
+    int playing_sync_decks = 0;
+    Syncable* unique_syncable = nullptr;
+    foreach (Syncable* pSyncable, m_syncables) {
+        if (!pSyncable->isSynchronized()) {
+            continue;
+        }
+
+        if (pSyncable->isPlaying()) {
+            if (playing_sync_decks > 0) {
+                return;
+            }
+            unique_syncable = pSyncable;
+            ++playing_sync_decks;
+        }
+    }
+    if (playing_sync_decks == 1) {
+        unique_syncable->notifyOnlyPlayingSyncable();
+    }
 }

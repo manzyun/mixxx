@@ -1,5 +1,4 @@
-#ifndef SYNCABLE_H
-#define SYNCABLE_H
+#pragma once
 
 #include <QString>
 
@@ -32,6 +31,10 @@ inline bool toSynchronized(SyncMode mode) {
     return mode > SYNC_NONE;
 }
 
+inline bool isFollower(SyncMode mode) {
+    return (mode == SYNC_FOLLOWER);
+}
+
 inline bool isMaster(SyncMode mode) {
     return (mode == SYNC_MASTER_SOFT || mode == SYNC_MASTER_EXPLICIT);
 }
@@ -40,7 +43,7 @@ inline bool isMaster(SyncMode mode) {
 /// in Master Sync.
 class Syncable {
   public:
-    virtual ~Syncable() { }
+    virtual ~Syncable() = default;
     virtual const QString& getGroup() const = 0;
     virtual EngineChannel* getChannel() const = 0;
 
@@ -99,7 +102,7 @@ class Syncable {
 /// information about sync change requests.
 class SyncableListener {
   public:
-    virtual ~SyncableListener() {}
+    virtual ~SyncableListener() = default;
 
     // Used by Syncables to tell EngineSync it wants to be enabled in a
     // specific mode. If the state change is accepted, EngineSync calls
@@ -112,7 +115,7 @@ class SyncableListener {
 
     // A Syncable must never call notifyBpmChanged in response to a setMasterBpm()
     // call.
-    virtual void notifyBpmChanged(Syncable* pSyncable, double bpm) = 0;
+    virtual void notifyBaseBpmChanged(Syncable* pSyncable, double bpm) = 0;
     virtual void requestBpmUpdate(Syncable* pSyncable, double bpm) = 0;
 
     // Syncables notify EngineSync directly about various events. EngineSync
@@ -132,5 +135,3 @@ class SyncableListener {
 
     virtual Syncable* getMasterSyncable() = 0;
 };
-
-#endif /* SYNCABLE_H */
