@@ -334,10 +334,11 @@ TEST_F(EngineSyncTest, InternalMasterSetFollowerSliderMoves) {
     // If internal is master, and we turn on a follower, the slider should move.
     auto pButtonMasterSyncInternal = std::make_unique<ControlProxy>(
             m_sInternalClockGroup, "sync_master");
-    pButtonMasterSyncInternal->slotSet(1);
     auto pMasterSyncSlider =
             std::make_unique<ControlProxy>(m_sInternalClockGroup, "bpm");
+
     pMasterSyncSlider->set(100.0);
+    pButtonMasterSyncInternal->slotSet(1);
 
     // Set the file bpm of channel 1 to 80 bpm.
     mixxx::BeatsPointer pBeats1 = BeatFactory::makeBeatGrid(m_pTrack1->getSampleRate(), 80, 0.0);
@@ -1072,6 +1073,7 @@ TEST_F(EngineSyncTest, SyncToNonSyncDeck) {
 
     ControlObject::set(ConfigKey(m_sGroup1, "play"), 1.0);
     ControlObject::set(ConfigKey(m_sGroup2, "play"), 1.0);
+    ProcessBuffer();
 
     pButtonSyncEnabled2->set(1.0);
     pButtonSyncEnabled2->set(0.0);
@@ -1152,6 +1154,7 @@ TEST_F(EngineSyncTest, MomentarySyncDependsOnPlayingStates) {
     m_pTrack2->trySetBeats(pBeats2);
     ControlObject::set(ConfigKey(m_sGroup2, "rate"), getRateSliderValue(1.0));
     ControlObject::set(ConfigKey(m_sGroup2, "play"), 1.0);
+    ProcessBuffer();
     ProcessBuffer();
 
     // Set channel 1 to be enabled momentarily.
@@ -1419,6 +1422,8 @@ TEST_F(EngineSyncTest, ZeroLatencyRateChangeQuant) {
             ControlObject::getControl(ConfigKey(m_sGroup1, "beat_distance"))
                     ->get());
 
+    ProcessBuffer();
+
     for (int i = 0; i < 50; ++i) {
         ProcessBuffer();
         // Keep messing with the rate
@@ -1468,6 +1473,8 @@ TEST_F(EngineSyncTest, ZeroLatencyRateDiffQuant) {
                       ->get(),
             ControlObject::getControl(ConfigKey(m_sGroup1, "beat_distance"))
                     ->get());
+
+    ProcessBuffer();
 
     for (int i = 0; i < 50; ++i) {
         ProcessBuffer();
@@ -1642,6 +1649,8 @@ TEST_F(EngineSyncTest, HalfDoubleThenPlay) {
     ControlObject::getControl(ConfigKey(m_sGroup1, "rate"))
             ->set(getRateSliderValue(1.0));
 
+    ProcessBuffer();
+
     auto pButtonSyncEnabled1 =
             std::make_unique<ControlProxy>(m_sGroup1, "sync_enabled");
     pButtonSyncEnabled1->slotSet(1.0);
@@ -1674,8 +1683,12 @@ TEST_F(EngineSyncTest, HalfDoubleThenPlay) {
             ControlObject::getControl(ConfigKey(m_sGroup2, "local_bpm"))
                     ->get());
 
+    ProcessBuffer();
+
     ControlObject::getControl(ConfigKey(m_sGroup2, "play"))->set(1.0);
     ControlObject::getControl(ConfigKey(m_sGroup1, "play"))->set(1.0);
+
+    ProcessBuffer();
 
     EXPECT_DOUBLE_EQ(175.0,
             ControlObject::getControl(ConfigKey(m_sInternalClockGroup, "bpm"))
@@ -1805,6 +1818,56 @@ TEST_F(EngineSyncTest, HalfDoubleConsistency) {
             ControlObject::getControl(ConfigKey(m_sGroup1, "bpm"))->get());
     EXPECT_DOUBLE_EQ(180.0,
             ControlObject::getControl(ConfigKey(m_sGroup2, "bpm"))->get());
+}
+
+TEST_F(EngineSyncTest, HalfDoubleEachOther) {
+    // Confirm that repeated sync with both decks leads to the same
+    // Half/Double decision.
+    // This test demonstrates https://bugs.launchpad.net/mixxx/+bug/1921962
+    mixxx::BeatsPointer pBeats1 = BeatFactory::makeBeatGrid(m_pTrack1->getSampleRate(), 144, 0.0);
+    m_pTrack1->trySetBeats(pBeats1);
+    mixxx::BeatsPointer pBeats2 = BeatFactory::makeBeatGrid(m_pTrack2->getSampleRate(), 105, 0.0);
+    m_pTrack2->trySetBeats(pBeats2);
+
+    // Threshold 1.414 sqrt(2);
+    // 144 / 105 = 1.37
+    // 105 / 72 = 1.46
+    // expect 144 BPM
+
+    ControlObject::getControl(ConfigKey(m_sGroup2, "sync_enabled"))->set(1.0);
+    ControlObject::getControl(ConfigKey(m_sGroup2, "sync_enabled"))->set(0.0);
+
+    EXPECT_DOUBLE_EQ(144.0,
+            ControlObject::getControl(ConfigKey(m_sGroup2, "bpm"))->get());
+
+    ControlObject::getControl(ConfigKey(m_sGroup1, "sync_enabled"))->set(1.0);
+    ControlObject::getControl(ConfigKey(m_sGroup1, "sync_enabled"))->set(0.0);
+
+    EXPECT_DOUBLE_EQ(144.0,
+            ControlObject::getControl(ConfigKey(m_sGroup1, "bpm"))->get());
+
+    // Threshold 1.414 sqrt(2);
+    // 150 / 105 = 1.43
+    // 105 / 75 = 1.40
+    // expect 75 BPM
+
+    mixxx::BeatsPointer pBeats1b = BeatFactory::makeBeatGrid(m_pTrack1->getSampleRate(), 150, 0.0);
+    m_pTrack1->trySetBeats(pBeats1b);
+
+    EXPECT_DOUBLE_EQ(150.0,
+            ControlObject::getControl(ConfigKey(m_sGroup1, "bpm"))->get());
+
+    ControlObject::getControl(ConfigKey(m_sGroup2, "sync_enabled"))->set(1.0);
+    ControlObject::getControl(ConfigKey(m_sGroup2, "sync_enabled"))->set(0.0);
+
+    EXPECT_DOUBLE_EQ(75.0,
+            ControlObject::getControl(ConfigKey(m_sGroup2, "bpm"))->get());
+
+    ControlObject::getControl(ConfigKey(m_sGroup1, "sync_enabled"))->set(1.0);
+    ControlObject::getControl(ConfigKey(m_sGroup1, "sync_enabled"))->set(0.0);
+
+    EXPECT_DOUBLE_EQ(150.0,
+            ControlObject::getControl(ConfigKey(m_sGroup1, "bpm"))->get());
 }
 
 TEST_F(EngineSyncTest, SetFileBpmUpdatesLocalBpm) {
@@ -2121,6 +2184,8 @@ TEST_F(EngineSyncTest, QuantizeImpliesSyncPhase) {
     mixxx::BeatsPointer pBeats2 = BeatFactory::makeBeatGrid(m_pTrack2->getSampleRate(), 100, 0.0);
     m_pTrack2->trySetBeats(pBeats2);
 
+    ProcessBuffer();
+
     ControlObject::set(ConfigKey(m_sGroup1, "play"), 1.0);
     ControlObject::set(ConfigKey(m_sGroup2, "play"), 1.0);
     ProcessBuffer();
@@ -2199,9 +2264,10 @@ TEST_F(EngineSyncTest, QuantizeImpliesSyncPhase) {
     EXPECT_DOUBLE_EQ(100, ControlObject::get(ConfigKey(m_sGroup2, "bpm")));
 
     // we align here to the past beat, because beat_distance < 1.0/8
-    EXPECT_DOUBLE_EQ(
+    EXPECT_NEAR(
             ControlObject::get(ConfigKey(m_sGroup1, "beat_distance")) / 130 * 100,
-            ControlObject::get(ConfigKey(m_sGroup2, "beat_distance")));
+            ControlObject::get(ConfigKey(m_sGroup2, "beat_distance")),
+            1e-15);
 }
 
 TEST_F(EngineSyncTest, SeekStayInPhase) {
@@ -2220,7 +2286,8 @@ TEST_F(EngineSyncTest, SeekStayInPhase) {
     ProcessBuffer();
 
     // We expect to be two buffers ahead in a beat near 0.2
-    EXPECT_DOUBLE_EQ(0.050309901738473183, ControlObject::get(ConfigKey(m_sGroup1, "beat_distance")));
+    EXPECT_DOUBLE_EQ(0.050309901738473162,
+            ControlObject::get(ConfigKey(m_sGroup1, "beat_distance")));
     EXPECT_DOUBLE_EQ(0.18925937554508981, ControlObject::get(ConfigKey(m_sGroup1, "playposition")));
 
     // The same again with a stopped track loaded in Channel 2
@@ -2243,7 +2310,7 @@ TEST_F(EngineSyncTest, SeekStayInPhase) {
     ProcessBuffer();
 
     // We expect to be two buffers ahead in a beat near 0.2
-    EXPECT_DOUBLE_EQ(0.050309901738473183,
+    EXPECT_DOUBLE_EQ(0.050309901738473162,
             ControlObject::get(ConfigKey(m_sGroup1, "beat_distance")));
     EXPECT_DOUBLE_EQ(0.18925937554508981, ControlObject::get(ConfigKey(m_sGroup1, "playposition")));
 }
@@ -2309,9 +2376,12 @@ TEST_F(EngineSyncTest, QuantizeHotCueActivate) {
     pHotCue2Activate->set(1.0);
     ProcessBuffer();
 
+    // Beat_distance is the distance to the previous beat wich has already passed.
+    // We compare here the distance to the next beat (1 - beat_distance) and
+    // scale it by the different tempos.
     EXPECT_NEAR(
-            ControlObject::get(ConfigKey(m_sGroup1, "beat_distance")) / 130 * 100,
-            ControlObject::get(ConfigKey(m_sGroup2, "beat_distance")),
+            (1 - ControlObject::get(ConfigKey(m_sGroup1, "beat_distance"))) / 130 * 100,
+            (1 - ControlObject::get(ConfigKey(m_sGroup2, "beat_distance"))),
             1e-15);
 
     pHotCue2Activate->set(0.0);
@@ -2426,8 +2496,12 @@ TEST_F(EngineSyncTest, BeatMapQantizePlay) {
 
     ProcessBuffer();
 
-    EXPECT_DOUBLE_EQ(m_pChannel1->getEngineBuffer()->m_pSyncControl->getBeatDistance(),
-            m_pChannel2->getEngineBuffer()->m_pSyncControl->getBeatDistance());
+    // Beat Distance shall be still 0, because we are before the first beat.
+    // This was fixed in https://bugs.launchpad.net/mixxx/+bug/1920084
+    EXPECT_DOUBLE_EQ(m_pChannel2->getEngineBuffer()->m_pSyncControl->getBeatDistance(), 0);
+    EXPECT_DOUBLE_EQ(
+            ControlObject::get(ConfigKey(m_sGroup1, "playposition")),
+            ControlObject::get(ConfigKey(m_sGroup2, "playposition")));
 }
 
 TEST_F(EngineSyncTest, BpmAdjustFactor) {
@@ -2468,5 +2542,41 @@ TEST_F(EngineSyncTest, BpmAdjustFactor) {
     EXPECT_DOUBLE_EQ(80.0, ControlObject::get(ConfigKey(m_sGroup2, "bpm")));
     ASSERT_TRUE(isFollower(m_sGroup1));
     ASSERT_TRUE(isFollower(m_sGroup2));
+    ASSERT_TRUE(isSoftMaster(m_sInternalClockGroup));
+}
+
+TEST_F(EngineSyncTest, ImpliciteMasterToInternalClock) {
+    m_pMixerDeck1->loadFakeTrack(false, 40.0);
+    m_pMixerDeck2->loadFakeTrack(false, 150.0);
+    ProcessBuffer();
+
+    EXPECT_DOUBLE_EQ(40.0, ControlObject::get(ConfigKey(m_sGroup1, "bpm")));
+    EXPECT_DOUBLE_EQ(150.0, ControlObject::get(ConfigKey(m_sGroup2, "bpm")));
+
+    // During cue-ing volume is 0.0
+    ControlObject::set(ConfigKey(m_sGroup1, "volume"), 0.0);
+    ControlObject::set(ConfigKey(m_sGroup1, "play"), 1.0);
+    ControlObject::set(ConfigKey(m_sGroup2, "play"), 1.0);
+    ProcessBuffer();
+
+    ControlObject::set(ConfigKey(m_sGroup1, "sync_enabled"), 1.0);
+    ControlObject::set(ConfigKey(m_sGroup2, "sync_enabled"), 1.0);
+    ProcessBuffer();
+
+    // group 2 should be synced to the first playing deck and becomes master
+    EXPECT_DOUBLE_EQ(75.0, ControlObject::get(ConfigKey(m_sGroup1, "bpm")));
+    EXPECT_DOUBLE_EQ(150.0, ControlObject::get(ConfigKey(m_sGroup2, "bpm")));
+    ASSERT_FALSE(isSoftMaster(m_sGroup1));
+    ASSERT_TRUE(isSoftMaster(m_sGroup2));
+    ASSERT_FALSE(isSoftMaster(m_sInternalClockGroup));
+    ProcessBuffer();
+
+    // Drop Track
+    ControlObject::set(ConfigKey(m_sGroup1, "volume"), 1.0);
+    ProcessBuffer();
+    ProcessBuffer();
+
+    ASSERT_FALSE(isSoftMaster(m_sGroup1));
+    ASSERT_FALSE(isSoftMaster(m_sGroup2));
     ASSERT_TRUE(isSoftMaster(m_sInternalClockGroup));
 }
