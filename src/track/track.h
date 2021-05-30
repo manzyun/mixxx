@@ -30,8 +30,6 @@ class Track : public QObject {
     // testing purposes. The resulting track will neither be stored
     // in the database nor will the metadata of the corresponding file
     // be updated.
-    // Use SoundSourceProxy::importTemporaryTrack() for importing files
-    // to ensure that the file will not be written while reading it!
     static TrackPointer newTemporary(
             mixxx::FileAccess fileAccess = mixxx::FileAccess());
     static TrackPointer newTemporary(
@@ -328,21 +326,22 @@ class Track : public QObject {
     bool refreshCoverImageDigest(
             const QImage& loadedImage = QImage());
 
-    // Set/get track metadata and cover art (optional) all at once.
-    void importMetadata(
+    /// Set track metadata after importing from the source.
+    ///
+    /// The timestamp tracks when metadata has last been synchronized
+    /// with file tags, either by importing or exporting the metadata.
+    void replaceMetadataFromSource(
             mixxx::TrackMetadata importedMetadata,
-            const QDateTime& metadataSynchronized = QDateTime());
-    // Merge additional metadata that is not (yet) stored in the database
-    // and only available from file tags.
-    void mergeImportedMetadata(
-            const mixxx::TrackMetadata& importedMetadata);
+            const QDateTime& metadataSynchronized);
 
-    void readTrackMetadata(
-            mixxx::TrackMetadata* pTrackMetadata,
+    mixxx::TrackMetadata getMetadata(
             bool* pMetadataSynchronized = nullptr) const;
-    void readTrackRecord(
-            mixxx::TrackRecord* pTrackRecord,
+
+    mixxx::TrackRecord getRecord(
             bool* pDirty = nullptr) const;
+    bool replaceRecord(
+            mixxx::TrackRecord newRecord,
+            mixxx::BeatsPointer pOptionalBeats = nullptr);
 
     // Mark the track dirty if it isn't already.
     void markDirty();
@@ -445,10 +444,16 @@ class Track : public QObject {
     void importPendingCueInfosMarkDirtyAndUnlock(
             QMutexLocker* pLock);
 
+    /// Merge additional metadata that is not (yet) stored in the database
+    /// and only available from file tags.
+    ///
+    /// Returns true if the track has been modified and false otherwise.
+    bool mergeExtraMetadataFromSource(
+            const mixxx::TrackMetadata& importedMetadata);
 
     ExportTrackMetadataResult exportMetadata(
-            mixxx::MetadataSourcePointer pMetadataSource,
-            UserSettingsPointer pConfig);
+            const mixxx::MetadataSource& metadataSource,
+            const UserSettingsPointer& pConfig);
 
     // Information about the actual properties of the
     // audio stream is only available after opening the

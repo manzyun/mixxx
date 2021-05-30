@@ -130,6 +130,7 @@ class EngineBuffer : public EngineObject {
     double getExactPlayPos() const;
     double getVisualPlayPos() const;
     double getTrackSamples() const;
+    double getUserOffset() const;
 
     double getRateRatio() const;
 
@@ -192,6 +193,11 @@ class EngineBuffer : public EngineObject {
     void slotUpdatedTrackBeats();
 
   private:
+    struct QueuedSeek {
+        double position;
+        enum SeekRequest seekType;
+    };
+
     // Add an engine control to the EngineBuffer
     // must not be called outside the Constructor
     void addControl(EngineControl* pControl);
@@ -250,7 +256,8 @@ class EngineBuffer : public EngineObject {
     FRIEND_TEST(EngineSyncTest, HalfDoubleThenPlay);
     FRIEND_TEST(EngineSyncTest, UserTweakBeatDistance);
     FRIEND_TEST(EngineSyncTest, UserTweakPreservedInSeek);
-    FRIEND_TEST(EngineSyncTest, BeatMapQantizePlay);
+    FRIEND_TEST(EngineSyncTest, FollowerUserTweakPreservedInMasterChange);
+    FRIEND_TEST(EngineSyncTest, BeatMapQuantizePlay);
     FRIEND_TEST(EngineBufferTest, ScalerNoTransport);
     EngineSync* m_pEngineSync;
     SyncControl* m_pSyncControl;
@@ -377,11 +384,12 @@ class EngineBuffer : public EngineObject {
     // Indicates that dependency injection has taken place.
     bool m_bScalerOverride;
 
-    QAtomicInt m_iSeekQueued;
     QAtomicInt m_iSeekPhaseQueued;
     QAtomicInt m_iEnableSyncQueued;
     QAtomicInt m_iSyncModeQueued;
-    ControlValueAtomic<double> m_queuedSeekPosition;
+    ControlValueAtomic<QueuedSeek> m_queuedSeek;
+    static constexpr QueuedSeek kNoQueuedSeek = {
+            -1.0, SEEK_NONE}; // value used if no seek is queued
     QAtomicPointer<EngineChannel> m_pChannelToCloneFrom;
 
     // Is true if the previous buffer was silent due to pausing

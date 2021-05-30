@@ -47,13 +47,6 @@ class SoundSourceProxy {
     static mixxx::SoundSourceProviderPointer getPrimaryProviderForFileExtension(
             const QString& fileExtension);
 
-    // The following import functions ensure that the file will not be
-    // written while reading it!
-    static TrackPointer importTemporaryTrack(
-            mixxx::FileAccess trackFileAccess);
-    static QImage importTemporaryCoverImage(
-            mixxx::FileAccess trackFileAccess);
-
     explicit SoundSourceProxy(
             TrackPointer pTrack,
             const mixxx::SoundSourceProviderPointer& pProvider = nullptr);
@@ -80,9 +73,39 @@ class SoundSourceProxy {
         return m_pProvider;
     }
 
+    /// Import both track metadata and/or cover image from a file.
+    ///
+    /// Pass nullptr for an out parameter if the corresponding data
+    /// is not needed.
+    ///
+    /// This function is thread-safe and can be invoked from any thread.
+    /// It ensures that no other thread writes the file concurrently
+    /// by keeping the corresponding file location in GlobalTrackCache
+    /// while reading.
+    static std::pair<mixxx::MetadataSource::ImportResult, QDateTime>
+    importTrackMetadataAndCoverImageFromFile(
+            mixxx::FileAccess trackFileAccess,
+            mixxx::TrackMetadata* pTrackMetadata,
+            QImage* pCoverImage);
+
+    /// Import both track metadata and/or the cover image of the
+    /// captured track object from the corresponding file.
+    ///
+    /// The captured track object is not modified, i.e. the data is read
+    /// from the file directly into the provided out parameters. Pass nullptr
+    /// for an out parameter if the corresponding data is not needed.
+    ///
+    /// If the captured track pointer is managed by GlobalTrackCache
+    /// reading from the file is safe, i.e. the read operation could
+    /// not be interleaved with a write operation when exporting metadata.
+    std::pair<mixxx::MetadataSource::ImportResult, QDateTime>
+    importTrackMetadataAndCoverImage(
+            mixxx::TrackMetadata* pTrackMetadata,
+            QImage* pCoverImage) const;
+
     /// Controls which (metadata/coverart) and how tags are (re-)imported from
     /// audio files when creating a SoundSourceProxy.
-    enum class ImportTrackMetadataMode {
+    enum class UpdateTrackFromSourceMode {
         // Import both track metadata and cover image once for new track objects.
         // Otherwise the request is ignored and the track object is not modified.
         Once,
@@ -116,13 +139,10 @@ class SoundSourceProxy {
     /// too many possible reasons for failure to consider that cannot be handled
     /// properly. The application log will contain warning messages for a detailed
     /// analysis in case unexpected behavior has been reported.
-    void updateTrackFromSource(
-            ImportTrackMetadataMode importTrackMetadataMode = ImportTrackMetadataMode::Default);
-
-    /// Parse only the metadata from the file without modifying
-    /// the referenced track.
-    mixxx::MetadataSource::ImportResult importTrackMetadata(
-            mixxx::TrackMetadata* pTrackMetadata) const;
+    ///
+    /// Returns true if the track has been modified and false otherwise.
+    bool updateTrackFromSource(
+            UpdateTrackFromSourceMode mode = UpdateTrackFromSourceMode::Default);
 
     /// Opening the audio source through the proxy will update the
     /// audio properties of the corresponding track object. Returns
@@ -149,17 +169,14 @@ class SoundSourceProxy {
 
     friend class TrackCollectionManager;
     static ExportTrackMetadataResult exportTrackMetadataBeforeSaving(
-            Track* pTrack, UserSettingsPointer pConfig);
+            Track* pTrack,
+            const UserSettingsPointer& pConfig);
 
     // Special case: Construction from a url is needed
     // for writing metadata immediately before the TIO is destroyed.
     explicit SoundSourceProxy(
             const QUrl& url,
             const mixxx::SoundSourceProviderPointer& pProvider = nullptr);
-
-    // Parse only the cover image from the file without modifying
-    // the referenced track.
-    QImage importCoverImage() const;
 
     const TrackPointer m_pTrack;
 
